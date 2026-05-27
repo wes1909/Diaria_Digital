@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-heading">
+    <div>
+        <h1>Servidores</h1>
+        <p class="muted">Cadastre e edite solicitantes e validadores.</p>
+    </div>
+    <a class="button" href="{{ url_for('new_user') }}">Novo servidor</a>
+</div>
+
+<form method="get" class="filter-bar">
+    <label>
+        Perfil
+        <select name="role">
+            <option value="">Todos</option>
+            {% for role, label in role_labels.items() %}
+                <option value="{{ role }}" {% if selected_role == role %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    <label>
+        Buscar
+        <input type="search" name="q" value="{{ search }}" placeholder="Nome, e-mail ou matrícula">
+    </label>
+    <div class="filter-actions">
+        <button type="submit">Filtrar</button>
+        <a class="button secondary" href="{{ url_for('users_list') }}">Limpar</a>
+    </div>
+</form>
+
+<section class="table-card">
+    <table>
+        <caption class="sr-only">Lista de servidores cadastrados</caption>
+        <thead>
+            <tr>
+                <th>Nome</th>
+                <th>Matrícula</th>
+                <th>Cargo/Função</th>
+                <th>E-mail</th>
+                <th>Perfil</th>
+                <th>Ação</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in users %}
+                <tr>
+                    <td>{{ item["name"] }}</td>
+                    <td>{{ item["registration"] or "-" }}</td>
+                    <td>{{ item["public_position"] or "-" }}</td>
+                    <td>{{ item["email"] }}</td>
+                    <td>{{ role_labels.get(item["role"], item["role"]) }}</td>
+                    <td><a href="{{ url_for('edit_user', user_id=item['id']) }}">Editar</a></td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="6" class="empty">Nenhum servidor encontrado.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-heading">
+    <div>
+        <h1>Solicitação #{{ daily_request["id"] }}</h1>
+        <p class="muted">{{ daily_request["requester_name"] }} · {{ daily_request["requester_email"] }}</p>
+    </div>
+    <span class="badge large {{ daily_request['status']|status_class }}">{{ daily_request["status"]|status_label }}</span>
+</div>
+
+<section class="details">
+    <div>
+        <strong>Destino</strong>
+        <span>{{ daily_request["destination"] }}</span>
+    </div>
+    <div>
+        <strong>Período</strong>
+        <span>{{ daily_request["departure_date"]|date_br }} a {{ daily_request["return_date"]|date_br }}</span>
+    </div>
+    <div>
+        <strong>Valor total da diária</strong>
+        <span>R$ {{ daily_request["estimated_amount"]|moeda_br }}</span>
+    </div>
+    {% if daily_request["daily_group"] %}
+        <div>
+            <strong>Grupo do servidor</strong>
+            <span>{{ daily_groups.get(daily_request["daily_group"], daily_request["daily_group"]) }}</span>
+        </div>
+    {% endif %}
+    {% if daily_request["daily_range"] %}
+        <div>
+            <strong>Enquadramento</strong>
+            <span>{{ daily_ranges.get(daily_request["daily_range"], daily_request["daily_range"]) }}</span>
+        </div>
+    {% endif %}
+    {% if daily_request["has_overnight"] is not none %}
+        <div>
+            <strong>Tipo de diária</strong>
+            <span>{{ "Integral, com estadia" if daily_request["has_overnight"] else "Meia diária, sem estadia" }}</span>
+        </div>
+    {% endif %}
+    <div>
+        <strong>Objetivo</strong>
+        <span>{{ daily_request["objective"] }}</span>
+    </div>
+    {% if daily_request["accountability_text"] %}
+        <div>
+            <strong>Prestação de contas</strong>
+            <span>{{ daily_request["accountability_text"] }}</span>
+        </div>
+        <div>
+            <strong>Horários da viagem</strong>
+            <span>{{ daily_request["accountability_departure_time"] or "-" }} a {{ daily_request["accountability_arrival_time"] or "-" }}</span>
+        </div>
+        <div>
+            <strong>Meio de transporte</strong>
+            <span>{{ daily_request["transport_mode"] or "-" }}</span>
+        </div>
+        {% if daily_request["transport_mode"] == "Veículo oficial" %}
+            <div>
+                <strong>Quilometragem</strong>
+                <span>Saída: {{ daily_request["departure_km"] }} km · Chegada: {{ daily_request["arrival_km"] }} km</span>
+            </div>
+        {% endif %}
+        <div>
+            <strong>Valor a devolver</strong>
+            <span>R$ {{ (daily_request["refund_amount"] or 0)|moeda_br }}</span>
+        </div>
+    {% endif %}
+    {% if daily_request["validator_comment"] %}
+        <div>
+            <strong>Parecer do validador</strong>
+            <span>{{ daily_request["validator_comment"] }}</span>
+        </div>
+    {% endif %}
+</section>
+
+<section class="split">
+    <div class="panel">
+        <h2>Anexos</h2>
+        <ul class="attachments">
+            {% for attachment in attachments %}
+                <li>
+                    <span>{{ attachment["kind"] }}{% if attachment["attachment_type"] %} · {{ attachment["attachment_type"] }}{% endif %} · {{ attachment["original_name"] }}</span>
+                    <a href="{{ url_for('uploaded_file', filename=attachment['filename']) }}">Baixar</a>
+                </li>
+            {% else %}
+                <li class="empty">Nenhum anexo enviado.</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    {% if current_user["role"] == "solicitante" and daily_request["status"] == "correcao_solicitada" %}
+        <div class="panel">
+            <h2>Correção solicitada</h2>
+            <p class="muted">Revise os campos da solicitação conforme o parecer do validador e encaminhe novamente.</p>
+            <a class="button" href="{{ url_for('edit_request', request_id=daily_request['id']) }}">Editar solicitação</a>
+        </div>
+    {% endif %}
+
+    {% if current_user["role"] == "solicitante" and daily_request["status"] in ["aprovada", "prestacao_correcao_solicitada"] %}
+        <div class="panel">
+            <h2>{{ "Corrigir prestação de contas" if daily_request["status"] == "prestacao_correcao_solicitada" else "Enviar prestação de contas" }}</h2>
+            <p class="muted">Preencha os dados da prestação e anexe os comprovantes exigidos.</p>
+            <a class="button" href="{{ url_for('submit_accountability', request_id=daily_request['id']) }}">Abrir prestação</a>
+        </div>
+    {% endif %}
+
+    {% if current_user["role"] == "validador" and daily_request["status"] in ["prestacao_enviada", "prestacao_corrigida"] %}
+        <div class="panel">
+            <h2>Avaliação da prestação</h2>
+            <form method="post" action="{{ url_for('evaluate_request', request_id=daily_request['id']) }}" class="form compact">
+                <label>
+                    Comentário
+                    <textarea name="validator_comment" rows="5" placeholder="Registre ressalva, pendência ou justificativa">{{ daily_request["validator_comment"] or "" }}</textarea>
+                </label>
+                <div class="actions">
+                    <button type="submit" name="action" value="request_correction" class="secondary">Solicitar correção</button>
+                    <button type="submit" name="action" value="approve">Aprovar</button>
+                    <button type="submit" name="action" value="approve_with_reservations">Aprovar com ressalvas</button>
+                    <button type="submit" name="action" value="reject" class="danger-button">Rejeitar</button>
+                </div>
+            </form>
+        </div>
+    {% elif current_user["role"] == "validador" and daily_request["status"] in ["enviada", "corrigida", "correcao_solicitada", "aprovada"] %}
+        <div class="panel">
+            <h2>Avaliação</h2>
+            <form method="post" action="{{ url_for('evaluate_request', request_id=daily_request['id']) }}" class="form compact">
+                <label>
+                    Comentário
+                    <textarea name="validator_comment" rows="5" placeholder="Registre orientação, pendência ou justificativa">{{ daily_request["validator_comment"] or "" }}</textarea>
+                </label>
+                <div class="actions">
+                    <button type="submit" name="action" value="request_correction" class="secondary">Solicitar correção</button>
+                    {% if daily_request["status"] != "aprovada" %}
+                        <button type="submit" name="action" value="approve">Aprovar</button>
+                    {% endif %}
+                    <button type="submit" name="action" value="reject" class="danger-button">Rejeitar</button>
+                </div>
+            </form>
+        </div>
+    {% elif current_user["role"] == "validador" %}
+        <div class="panel">
+            <h2>Avaliação</h2>
+            <p class="muted">Nenhuma ação disponível para o status atual.</p>
+        </div>
+    {% endif %}
+</section>
+{% endblock %}

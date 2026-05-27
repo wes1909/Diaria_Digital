@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-heading">
+    <div>
+        <h1>{{ form_title }}</h1>
+        <p class="muted">{{ form_description }}</p>
+    </div>
+</div>
+
+{% if daily_request and daily_request["validator_comment"] %}
+    <section class="notice-panel">
+        <strong>Parecer do validador</strong>
+        <span>{{ daily_request["validator_comment"] }}</span>
+    </section>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" class="form wide" action="{{ form_action }}">
+    <div class="grid">
+        <label class="required">
+            Estado
+            <select id="stateSelect" name="state" required data-initial-value="{{ initial_state }}">
+                <option value="">Selecione o estado</option>
+            </select>
+        </label>
+        <label class="required">
+            Cidade
+            <select id="citySelect" name="city" required disabled data-initial-value="{{ initial_city }}">
+                <option value="">Selecione primeiro o estado</option>
+            </select>
+            <input type="hidden" id="destinationInput" name="destination" required>
+        </label>
+        <label class="required">
+            Data de saída
+            <span class="date-control">
+                <input id="departureDateDisplay" class="date-display" type="text" value="" placeholder="dd/mm/aaaa" readonly role="button" aria-label="Abrir calendário da data de saída">
+                <input id="departureDate" class="native-date" type="date" name="departure_date" value="{{ daily_request['departure_date'] if daily_request else '' }}" required aria-label="Data de saída" tabindex="-1">
+            </span>
+        </label>
+        <label class="required">
+            Data de retorno
+            <span class="date-control">
+                <input id="returnDateDisplay" class="date-display" type="text" value="" placeholder="dd/mm/aaaa" readonly role="button" aria-label="Abrir calendário da data de retorno">
+                <input id="returnDate" class="native-date" type="date" name="return_date" value="{{ daily_request['return_date'] if daily_request else '' }}" required aria-label="Data de retorno" tabindex="-1">
+            </span>
+        </label>
+        <div class="field-readonly">
+            <strong>Grupo do servidor</strong>
+            <span>{{ daily_groups.get(user_daily_group, "Grupo não cadastrado") }}</span>
+            <input id="dailyGroupSelect" type="hidden" value="{{ user_daily_group or '' }}">
+        </div>
+        <label class="required">
+            Enquadramento da viagem
+            <select id="dailyRangeSelect" name="daily_range" required disabled data-initial-value="{{ daily_request['daily_range'] if daily_request else '' }}">
+                <option value="">Selecione o enquadramento</option>
+            </select>
+        </label>
+        <label class="required">
+            Haverá estadia no local?
+            <select id="overnightSelect" name="has_overnight" required>
+                <option value="1" {% if not daily_request or daily_request["has_overnight"] %}selected{% endif %}>Sim, dormirei no destino</option>
+                <option value="0" {% if daily_request and not daily_request["has_overnight"] %}selected{% endif %}>Não, retorno no mesmo dia</option>
+            </select>
+        </label>
+        <label class="required">
+            Valor total da diária
+            <input id="estimatedAmountDisplay" type="text" value="R$ 0,00" readonly>
+            <input id="estimatedAmountInput" type="hidden" name="estimated_amount" value="0">
+        </label>
+    </div>
+    <label class="required">
+        Objetivo da viagem
+        <textarea name="objective" rows="5" required lang="pt-BR" spellcheck="true" placeholder="Descreva a finalidade institucional da viagem">{{ daily_request["objective"] if daily_request else "" }}</textarea>
+    </label>
+    <label>
+        Anexos da solicitação
+        <input type="file" name="attachments" multiple>
+    </label>
+    <div class="actions">
+        <a class="button secondary" href="{{ url_for('requester_dashboard') }}">Cancelar</a>
+        <button type="submit">{{ submit_label }}</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='localidades.js') }}"></script>
+<script src="{{ url_for('static', filename='calculo_diarias.js') }}"></script>
+<script src="{{ url_for('static', filename='restricoes_datas.js') }}"></script>
+<script src="{{ url_for('static', filename='campos_obrigatorios.js') }}"></script>
+{% endblock %}

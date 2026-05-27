@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="auth-panel">
+    <h1 class="acesso">Acesso ao sistema</h1>
+    <p class="muted">Ambiente acadêmico para demonstrar o fluxo de solicitação, prestação de contas e validação de diárias.</p>
+
+    <form method="post" class="form">
+        <label>
+            E-mail
+            <input type="email" name="email" required placeholder="Informe seu e-mail">
+        </label>
+        <label>
+            Senha
+            <input type="password" name="password" required placeholder="******">
+        </label>
+        <button type="submit">Entrar</button>
+    </form>
+
+    <div class="demo-users">
+        <strong>Usuários de demonstração</strong>
+        <span>Solicitante: solicitante@academico.test / 123456</span>
+        <span>Validador: validador@academico.test / 123456</span>
+    </div>
+</section>
+{% endblock %}

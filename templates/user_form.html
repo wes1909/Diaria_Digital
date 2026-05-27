@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% set is_edit = user is not none %}
+{% set is_self = is_edit and current_user["id"] == user["id"] %}
+{% set can_edit_role = current_user["role"] == "validador" and not is_self %}
+
+{% block content %}
+<div class="page-heading">
+    <div>
+        <h1>{{ "Editar servidor" if is_edit else "Novo servidor" }}</h1>
+        <p class="muted">Informe os dados cadastrais e de acesso.</p>
+    </div>
+</div>
+
+<form method="post" class="form wide">
+    <div class="grid">
+        <label class="required">
+            Nome
+            <input name="name" required value="{{ user['name'] if user else '' }}">
+        </label>
+        <label class="required">
+            Matrícula
+            <input name="registration" required value="{{ user['registration'] if user else '' }}">
+        </label>
+        <label class="required">
+            Cargo, emprego ou função
+            <input name="public_position" required value="{{ user['public_position'] if user else '' }}">
+        </label>
+        <label class="required">
+            E-mail
+            <input type="email" name="email" required value="{{ user['email'] if user else '' }}">
+        </label>
+        <label class="{% if not is_edit %}required{% endif %}">
+            Senha
+            <input type="password" name="password" {% if not is_edit %}required{% endif %} placeholder="{{ 'Deixe em branco para manter' if is_edit else 'Mínimo 6 caracteres' }}">
+        </label>
+        {% if can_edit_role or not is_edit %}
+            <label class="required">
+                Perfil
+                <select name="role" required>
+                    {% for role, label in role_labels.items() %}
+                        <option value="{{ role }}" {% if user and user["role"] == role %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+        {% else %}
+            <div class="field-readonly">
+                <strong>Perfil</strong>
+                <span>{{ role_labels.get(user["role"], user["role"]) }}</span>
+            </div>
+        {% endif %}
+        {% if can_edit_role or not is_edit %}
+            <label>
+                Grupo de diária
+                <select name="daily_group">
+                    <option value="">Não se aplica</option>
+                    {% for group, label in daily_groups.items() %}
+                        <option value="{{ group }}" {% if user and user["daily_group"] == group %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+        {% elif user["role"] == "solicitante" %}
+            <div class="field-readonly">
+                <strong>Grupo de diária</strong>
+                <span>{{ daily_groups.get(user["daily_group"], "Grupo não cadastrado") }}</span>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="actions">
+        <a class="button secondary" href="{{ url_for('users_list') if current_user['role'] == 'validador' else url_for('index') }}">Cancelar</a>
+        <button type="submit">Salvar</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='campos_obrigatorios.js') }}"></script>
+{% endblock %}

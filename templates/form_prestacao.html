@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-heading">
+    <div>
+        <h1>Prestação de contas</h1>
+        <p class="muted">Informe os dados finais da viagem e anexe os comprovantes.</p>
+    </div>
+</div>
+
+{% if daily_request["validator_comment"] and daily_request["status"] == "prestacao_correcao_solicitada" %}
+    <section class="notice-panel">
+        <strong>Parecer do validador</strong>
+        <span>{{ daily_request["validator_comment"] }}</span>
+    </section>
+{% endif %}
+
+<section class="details">
+    <div>
+        <strong>Nome</strong>
+        <span>{{ daily_request["requester_name"] }}</span>
+    </div>
+    <div>
+        <strong>Matrícula</strong>
+        <span>{{ daily_request["requester_registration"] or "-" }}</span>
+    </div>
+    <div>
+        <strong>Cargo, emprego ou função</strong>
+        <span>{{ daily_request["requester_position"] or "-" }}</span>
+    </div>
+    <div>
+        <strong>Quantia recebida</strong>
+        <span>R$ {{ daily_request["estimated_amount"]|moeda_br }}</span>
+    </div>
+    <div>
+        <strong>Data de saída</strong>
+        <span>{{ daily_request["departure_date"]|date_br }}</span>
+    </div>
+    <div>
+        <strong>Data de retorno</strong>
+        <span>{{ daily_request["return_date"]|date_br }}</span>
+    </div>
+</section>
+
+<form method="post" enctype="multipart/form-data" class="form wide">
+    <div class="grid">
+        <label class="required optional-when-full-refund">
+            Hora de saída
+            <input class="time-24" type="text" name="accountability_departure_time" value="{{ daily_request['accountability_departure_time'] or '' }}" required placeholder="hh:mm" maxlength="5" inputmode="numeric">
+        </label>
+        <label class="required optional-when-full-refund">
+            Hora de chegada
+            <input class="time-24" type="text" name="accountability_arrival_time" value="{{ daily_request['accountability_arrival_time'] or '' }}" required placeholder="hh:mm" maxlength="5" inputmode="numeric">
+        </label>
+        <label class="required full-row optional-when-full-refund">
+            Meio de transporte utilizado
+            <select id="transportMode" name="transport_mode" required>
+                <option value="">Selecione</option>
+                {% for mode in transport_modes %}
+                    <option value="{{ mode }}" {% if daily_request["transport_mode"] == mode %}selected{% endif %}>{{ mode }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <div class="official-vehicle-field km-group full-row">
+            <label>
+                KM de saída
+                <input id="departureKm" class="km-input" type="text" name="departure_km" inputmode="decimal" value="{{ daily_request['departure_km'] or '' }}">
+            </label>
+            <label>
+                KM de chegada
+                <input id="arrivalKm" class="km-input" type="text" name="arrival_km" inputmode="decimal" value="{{ daily_request['arrival_km'] or '' }}">
+            </label>
+        </div>
+        <label>
+            Valor recebido
+            <input type="text" value="R$ {{ daily_request['estimated_amount']|moeda_br }}" readonly>
+            <input type="hidden" name="received_amount" value="{{ '%.2f'|format(daily_request['estimated_amount']) }}">
+        </label>
+        <label>
+            Valor a devolver
+            <input id="refundAmountDisplay" type="text" value="R$ {{ (daily_request['refund_amount'] or 0)|moeda_br }}" inputmode="numeric">
+            <input id="refundAmountInput" type="hidden" name="refund_amount" value="{{ '%.2f'|format(daily_request['refund_amount'] or 0) }}" data-max="{{ '%.2f'|format(daily_request['estimated_amount']) }}">
+        </label>
+    </div>
+
+    <label class="required">
+        Resumo da viagem
+        <textarea name="accountability_text" rows="5" required>{{ daily_request["accountability_text"] or "" }}</textarea>
+    </label>
+
+    <section class="proof-section optional-when-full-refund">
+        <label class="required">
+            Comprovantes do deslocamento
+            <input type="file" name="displacement_attachments" accept=".pdf,.png,.jpg,.jpeg" multiple>
+        </label>
+        <p class="muted">PDFs ou fotos. Mínimo 1 e máximo 10. Exemplos: notas fiscais e comprovantes de deslocamento.</p>
+        {% if displacement_attachments %}
+            <ul class="attachments">
+                {% for attachment in displacement_attachments %}
+                    <li><span>{{ attachment["original_name"] }}</span><a href="{{ url_for('uploaded_file', filename=attachment['filename']) }}">Baixar</a></li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    </section>
+
+    <section class="proof-section optional-when-full-refund">
+        <label class="required">
+            Comprovantes do cumprimento do objetivo
+            <input type="file" name="objective_attachments" accept=".pdf,.png,.jpg,.jpeg" multiple>
+        </label>
+        <p class="muted">PDFs ou fotos. Mínimo 1 e máximo 10. Exemplos: lista de presença, foto no local e certificado.</p>
+        {% if objective_attachments %}
+            <ul class="attachments">
+                {% for attachment in objective_attachments %}
+                    <li><span>{{ attachment["original_name"] }}</span><a href="{{ url_for('uploaded_file', filename=attachment['filename']) }}">Baixar</a></li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    </section>
+
+    <div class="actions">
+        <a class="button secondary" href="{{ url_for('request_detail', request_id=daily_request['id']) }}">Cancelar</a>
+        <button type="submit">Enviar prestação</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='prestacao.js') }}"></script>
+<script src="{{ url_for('static', filename='campos_obrigatorios.js') }}"></script>
+{% endblock %}

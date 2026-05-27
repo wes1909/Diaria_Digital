@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Diária Digital</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}">
+</head>
+<body>
+    <a class="skip-link" href="#conteudo-principal">Pular para o conteúdo principal</a>
+    <header class="topbar">
+        <a class="brand" href="{{ url_for('index') }}">Diária Digital</a>
+        <div class="topbar-actions">
+            {% if current_user %}
+                <nav aria-label="Navegação principal">
+                    <span>{{ current_user["name"] }} · {{ current_user["role"] }}</span>
+                    {% if current_user["role"] == "validador" %}
+                        <a href="{{ url_for('users_list') }}">Usuários</a>
+                        <a href="{{ url_for('profile') }}">Meu cadastro</a>
+                    {% endif %}
+                    <a href="{{ url_for('logout') }}">Sair</a>
+                </nav>
+            {% endif %}
+            <button type="button" class="contrast-toggle" data-contrast-toggle aria-pressed="false">
+                Alto contraste
+            </button>
+        </div>
+    </header>
+
+    <main id="conteudo-principal" class="container" tabindex="-1">
+        {% for category, message in get_flashed_messages(with_categories=true) %}
+            <div class="alert {{ category }}" role="status" aria-live="polite">{{ message }}</div>
+        {% endfor %}
+        {% block content %}{% endblock %}
+    </main>
+    <script src="{{ url_for('static', filename='acessibilidade.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

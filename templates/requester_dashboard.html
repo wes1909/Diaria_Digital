@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-heading">
+    <div>
+        <h1>Minhas solicitações</h1>
+        <p class="muted">Cadastre viagens, envie comprovantes e acompanhe a validação.</p>
+    </div>
+    {% if overdue_accountability %}
+        <span class="button disabled">Nova solicitação</span>
+    {% else %}
+        <a class="button" href="{{ url_for('new_request') }}">Nova solicitação</a>
+    {% endif %}
+</div>
+
+{% if overdue_accountability %}
+    <section class="notice-panel danger-notice">
+        <strong>Prestação de contas pendente</strong>
+        <span>
+            A solicitação #{{ overdue_accountability["id"] }} com data de retorno em
+            {{ overdue_accountability["return_date"]|date_br }} ultrapassou o prazo de 48 horas de prestação de contas.
+            Regularize a prestação antes de criar nova solicitação.
+        </span>
+        <a href="{{ url_for('request_detail', request_id=overdue_accountability['id']) }}">Abrir solicitação pendente</a>
+    </section>
+{% endif %}
+
+<form method="get" class="filter-bar">
+    <label>
+        Status
+        <select name="status">
+            <option value="">Todos</option>
+            {% for status, label in status_labels.items() %}
+                <option value="{{ status }}" {% if selected_status == status %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    <label>
+        Buscar destino
+        <input type="search" name="q" value="{{ search }}" placeholder="Destino">
+    </label>
+    <div class="filter-actions">
+        <button type="submit">Filtrar</button>
+        <a class="button secondary" href="{{ url_for('requester_dashboard') }}">Limpar</a>
+    </div>
+</form>
+
+<section class="table-card">
+    <table>
+        <caption class="sr-only">Lista das minhas solicitações de diária</caption>
+        <thead>
+            <tr>
+                <th>Destino</th>
+                <th>Período</th>
+                <th>Valor total</th>
+                <th>Status</th>
+                <th>Ação</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in requests %}
+                <tr>
+                    <td>{{ item["destination"] }}</td>
+                    <td>{{ item["departure_date"]|date_br }} a {{ item["return_date"]|date_br }}</td>
+                    <td>R$ {{ item["estimated_amount"]|moeda_br }}</td>
+                    <td><span class="badge {{ item['status']|status_class }}">{{ item["status"]|status_label }}</span></td>
+                    <td><a href="{{ url_for('request_detail', request_id=item['id']) }}">Abrir</a></td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="5" class="empty">Nenhuma solicitação cadastrada.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}

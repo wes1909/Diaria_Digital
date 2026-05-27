@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-heading">
+    <div>
+        <h1>Validação de diárias</h1>
+        <p class="muted">Visualize solicitações, aprove ou peça correções ao solicitante.</p>
+    </div>
+</div>
+
+<form method="get" class="filter-bar">
+    <label>
+        Status
+        <select name="status">
+            <option value="">Todos</option>
+            {% for status, label in status_labels.items() %}
+                <option value="{{ status }}" {% if selected_status == status %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+    </label>
+    <label>
+        Buscar
+        <input type="search" name="q" value="{{ search }}" placeholder="Solicitante ou destino">
+    </label>
+    <div class="filter-actions">
+        <button type="submit">Filtrar</button>
+        <a class="button secondary" href="{{ url_for('validator_dashboard') }}">Limpar</a>
+    </div>
+</form>
+
+<section class="table-card">
+    <table>
+        <caption class="sr-only">Lista de solicitações aguardando validação</caption>
+        <thead>
+            <tr>
+                <th>Solicitante</th>
+                <th>Destino</th>
+                <th>Atualização</th>
+                <th>Status</th>
+                <th>Ação</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in requests %}
+                <tr>
+                    <td>{{ item["requester_name"] }}</td>
+                    <td>{{ item["destination"] }}</td>
+                    <td>{{ item["updated_at"]|datetime_br }}</td>
+                    <td><span class="badge {{ item['status']|status_class }}">{{ item["status"]|status_label }}</span></td>
+                    <td><a href="{{ url_for('request_detail', request_id=item['id']) }}">Avaliar</a></td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="5" class="empty">Nenhuma solicitação recebida.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}
