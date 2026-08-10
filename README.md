@@ -1,10 +1,71 @@
-# Sistema Web de Gestão de Diárias
+# Sistema Web de Gestao de Diarias
 
-Projeto acadêmico simples para demonstrar o fluxo de gestão de diárias com dois perfis:
+Projeto academico simples para demonstrar o fluxo de gestao de diarias com dois perfis:
 
-- Servidor solicitante: cadastra solicitação, informa dados da viagem, anexa comprovantes e envia prestação de contas.
-- Servidor validador: visualiza solicitações, aprova ou solicita correção.
-- Cálculo de diária por enquadramento do cargo, faixa da viagem e existência de estadia.
+- Servidor solicitante: cadastra solicitacao, informa destino, datas, horarios, pernoite, objetivo, anexos e envia prestacao de contas.
+- Servidor validador: cadastra usuarios, visualiza solicitacoes, confere o calculo automatico, aprova ou solicita correcao.
+- Calculo automatico da diaria por grupo funcional, municipio de destino, distancia cadastrada, faixa legal, duracao prevista e fator de pernoite.
+
+## Regras atuais de calculo
+
+Grupos funcionais:
+
+- `agente_politico_comissionado`: Prefeito Municipal, Vice-Prefeito, Vereadores e Secretarios.
+- `servidor_geral`: demais servidores publicos efetivos, contratados, temporarios e ocupantes de cargos em comissao.
+
+Valores-base:
+
+| Faixa | Prefeito/Vice/Vereadores/Secretarios | Demais servidores |
+|---|---:|---:|
+| Ate 200 km dentro de SC | R$ 300,00 | R$ 300,00 |
+| Acima de 200 km dentro de SC | R$ 600,00 | R$ 500,00 |
+| Fora de SC ate 1.000 km ou Capital de SC | R$ 700,00 | R$ 800,00 |
+| Acima de 1.000 km ou Capital Federal | R$ 1.500,00 | R$ 1.300,00 |
+
+Fatores por duracao e pernoite:
+
+- Superior a 12 horas com pernoite: fator 1,00.
+- Superior a 12 horas sem pernoite: fator 0,70.
+- Inferior a 12 horas sem pernoite: fator 0,50.
+
+O valor definitivo e sempre recalculado no backend Flask antes de salvar.
+
+## Municipios e distancias
+
+A lista de destinos fica em `static/localidades.js`, na estrutura `localidadesNomesBrasil`. Para o modo de demonstracao academica, a base foi reduzida para 15 destinos:
+
+| UF | Municipio | Distancia rodoviaria aproximada |
+|---|---|---:|
+| SC | Lebon Regis | 0 km |
+| SC | Cacador | 50 km |
+| SC | Fraiburgo | 55 km |
+| SC | Curitibanos | 85 km |
+| SC | Campos Novos | 135 km |
+| SC | Lages | 165 km |
+| SC | Chapeco | 240 km |
+| SC | Joinville | 300 km |
+| SC | Blumenau | 300 km |
+| SC | Florianopolis | 320 km |
+| PR | Curitiba | 260 km |
+| RS | Porto Alegre | 500 km |
+| SP | Sao Paulo | 650 km |
+| DF | Brasilia | 1.500 km |
+| RJ | Rio de Janeiro | 1.102 km |
+
+As distancias ficam no objeto `distanciasLocalidadesKm`, usando chaves no formato `UF|Municipio`. Os valores sao numericos e representam quilometros inteiros aproximados, sem a unidade `km` no codigo.
+
+Exemplo:
+
+```js
+const distanciasLocalidadesKm = {
+    "SC|Lebon Regis": 0,
+    "SC|Cacador": 50
+};
+```
+
+As distancias devem ser rodoviarias, considerando deslocamento por vias terrestres entre Lebon Regis/SC e a sede do municipio de destino. Nao use distancia em linha reta, formula de Haversine ou estimativas baseadas apenas em latitude e longitude.
+
+Rio de Janeiro/RJ foi cadastrado com 1.102 km para demonstrar destino comum acima de 1.000 km, com base em distancia rodoviaria aproximada consultada em RotaMapas e conferida com valor semelhante no Rome2Rio.
 
 ## Tecnologias
 
@@ -15,7 +76,7 @@ Projeto acadêmico simples para demonstrar o fluxo de gestão de diárias com do
 ## Como executar
 
 1. Crie e ative um ambiente virtual, se desejar.
-2. Instale as dependências:
+2. Instale as dependencias:
 
 ```bash
 pip install -r requirements.txt
@@ -29,15 +90,15 @@ python app.py
 
 4. Acesse `http://127.0.0.1:5000`.
 
-## Usuários de demonstração
+## Usuarios de demonstracao
 
 - Solicitante: `solicitante@academico.test` / `123456`
 - Validador: `validador@academico.test` / `123456`
 
-## Observações de escopo
+## Observacoes de escopo
 
-Este projeto é intencionalmente acadêmico e local. Para uso real, seria necessário reforçar segurança, auditoria, controle de permissões em anexos, regras formais de valores e integração com sistemas institucionais.
+Este projeto e intencionalmente academico e local. Para uso real, seria necessario reforcar seguranca, auditoria, controle de permissoes em anexos, regras formais de valores e integracao com sistemas institucionais.
 
-## Documentação complementar
+## Documentacao complementar
 
-Consulte `DOCUMENTACAO.md` para uma explicação em português sobre os fluxos, regras de negócio e principais nomes técnicos usados no código.
+Consulte `DOCUMENTACAO.md` para uma explicacao sobre fluxos, regras de negocio, banco de dados e principais nomes tecnicos usados no codigo.

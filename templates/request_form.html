@@ -29,6 +29,7 @@
                 <option value="">Selecione primeiro o estado</option>
             </select>
             <input type="hidden" id="destinationInput" name="destination" required>
+            <span id="destinationDistance" class="muted">Dist?ncia aproximada de Lebon R?gis: -</span>
         </label>
         <label class="required">
             Data de saída
@@ -38,11 +39,19 @@
             </span>
         </label>
         <label class="required">
+            Hora de saída
+            <input id="departureTime" class="time-24" type="text" name="departure_time" value="{{ daily_request['departure_time'] if daily_request and daily_request['departure_time'] else '' }}" required placeholder="hh:mm" maxlength="5" inputmode="numeric" pattern="[0-2][0-9]:[0-5][0-9]">
+        </label>
+        <label class="required">
             Data de retorno
             <span class="date-control">
                 <input id="returnDateDisplay" class="date-display" type="text" value="" placeholder="dd/mm/aaaa" readonly role="button" aria-label="Abrir calendário da data de retorno">
                 <input id="returnDate" class="native-date" type="date" name="return_date" value="{{ daily_request['return_date'] if daily_request else '' }}" required aria-label="Data de retorno" tabindex="-1">
             </span>
+        </label>
+        <label class="required">
+            Hora prevista de retorno
+            <input id="returnTime" class="time-24" type="text" name="return_time" value="{{ daily_request['return_time'] if daily_request and daily_request['return_time'] else '' }}" required placeholder="hh:mm" maxlength="5" inputmode="numeric" pattern="[0-2][0-9]:[0-5][0-9]">
         </label>
         <div class="field-readonly">
             <strong>Grupo do servidor</strong>
@@ -50,24 +59,50 @@
             <input id="dailyGroupSelect" type="hidden" value="{{ user_daily_group or '' }}">
         </div>
         <label class="required">
-            Enquadramento da viagem
-            <select id="dailyRangeSelect" name="daily_range" required disabled data-initial-value="{{ daily_request['daily_range'] if daily_request else '' }}">
-                <option value="">Selecione o enquadramento</option>
-            </select>
-        </label>
-        <label class="required">
-            Haverá estadia no local?
+            Haverá pernoite?
             <select id="overnightSelect" name="has_overnight" required>
-                <option value="1" {% if not daily_request or daily_request["has_overnight"] %}selected{% endif %}>Sim, dormirei no destino</option>
-                <option value="0" {% if daily_request and not daily_request["has_overnight"] %}selected{% endif %}>Não, retorno no mesmo dia</option>
+                <option value="1" {% if not daily_request or daily_request["has_overnight"] %}selected{% endif %}>Sim</option>
+                <option value="0" {% if daily_request and not daily_request["has_overnight"] %}selected{% endif %}>Não</option>
             </select>
         </label>
         <label class="required">
-            Valor total da diária
+            Valor total
             <input id="estimatedAmountDisplay" type="text" value="R$ 0,00" readonly>
             <input id="estimatedAmountInput" type="hidden" name="estimated_amount" value="0">
         </label>
     </div>
+
+    <section class="details">
+        <div>
+            <strong>Destino</strong>
+            <span id="summaryDestination">-</span>
+        </div>
+        <div>
+            <strong>Distância aproximada</strong>
+            <span id="summaryDistance">-</span>
+        </div>
+        <div>
+            <strong>Duração prevista</strong>
+            <span id="summaryDuration">-</span>
+        </div>
+        <div>
+            <strong>Faixa identificada pelo sistema</strong>
+            <span id="summaryRange">-</span>
+        </div>
+        <div>
+            <strong>Fator aplicado</strong>
+            <span id="summaryFactor">-</span>
+        </div>
+        <div>
+            <strong>Valor-base</strong>
+            <span id="summaryBaseAmount">-</span>
+        </div>
+        <div>
+            <strong>Valor total estimado</strong>
+            <span id="summaryTotalAmount">R$ 0,00</span>
+        </div>
+    </section>
+
     <label class="required">
         Objetivo da viagem
         <textarea name="objective" rows="5" required lang="pt-BR" spellcheck="true" placeholder="Descreva a finalidade institucional da viagem">{{ daily_request["objective"] if daily_request else "" }}</textarea>
@@ -85,6 +120,7 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='localidades.js') }}"></script>
+<script src="{{ url_for('static', filename='horarios_24h.js') }}"></script>
 <script src="{{ url_for('static', filename='calculo_diarias.js') }}"></script>
 <script src="{{ url_for('static', filename='restricoes_datas.js') }}"></script>
 <script src="{{ url_for('static', filename='campos_obrigatorios.js') }}"></script>

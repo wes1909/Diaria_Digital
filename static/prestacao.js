@@ -2,7 +2,6 @@ const campoMeioTransporte = document.querySelector("#transportMode");
 const camposVeiculoOficial = document.querySelectorAll(".official-vehicle-field");
 const campoKmSaida = document.querySelector("#departureKm");
 const campoKmChegada = document.querySelector("#arrivalKm");
-const camposHora24 = document.querySelectorAll(".time-24");
 const camposKm = document.querySelectorAll(".km-input");
 const campoValorDevolverVisual = document.querySelector("#refundAmountDisplay");
 const campoValorDevolver = document.querySelector("#refundAmountInput");
@@ -31,38 +30,6 @@ if (campoMeioTransporte) {
     atualizarCamposVeiculoOficial();
     campoMeioTransporte.addEventListener("change", atualizarCamposVeiculoOficial);
 }
-
-camposHora24.forEach((campo) => {
-    campo.addEventListener("input", () => {
-        const digitos = campo.value.replace(/\D/g, "").slice(0, 4);
-        if (digitos.length <= 2) {
-            campo.value = digitos;
-            return;
-        }
-        campo.value = `${digitos.slice(0, 2)}:${digitos.slice(2, 4)}`;
-    });
-
-    campo.addEventListener("blur", () => {
-        if (!campo.value) {
-            return;
-        }
-        const [horas, minutos] = campo.value.split(":").map(Number);
-        if (
-            Number.isNaN(horas) ||
-            Number.isNaN(minutos) ||
-            horas > 23 ||
-            minutos > 59 ||
-            campo.value.length !== 5
-        ) {
-            campo.setCustomValidity("Informe um horário válido no formato 24 horas HH:MM.");
-            campo.classList.add("is-invalid");
-            campo.reportValidity();
-            return;
-        }
-        campo.setCustomValidity("");
-        campo.classList.remove("is-invalid");
-    });
-});
 
 camposKm.forEach((campo) => {
     campo.addEventListener("input", () => {

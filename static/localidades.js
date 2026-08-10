@@ -1,98 +1,65 @@
-const localidadesBrasil = {
-    AC: ["Rio Branco", "Cruzeiro do Sul", "Sena Madureira", "Tarauaca", "Feijo"],
-    AL: ["Maceio", "Arapiraca", "Palmeira dos Indios", "Rio Largo", "Penedo"],
-    AP: ["Macapa", "Santana", "Laranjal do Jari", "Oiapoque", "Porto Grande"],
-    AM: ["Manaus", "Parintins", "Itacoatiara", "Manacapuru", "Coari"],
-    BA: ["Salvador", "Feira de Santana", "Vitoria da Conquista", "Camacari", "Ilheus"],
-    CE: ["Fortaleza", "Juazeiro do Norte", "Sobral", "Caucaia", "Crato"],
-    DF: ["Brasilia"],
-    ES: ["Vitoria", "Vila Velha", "Serra", "Cariacica", "Linhares"],
-    GO: ["Goiania", "Aparecida de Goiania", "Anapolis", "Rio Verde", "Luziania"],
-    MA: ["Sao Luis", "Imperatriz", "Caxias", "Timon", "Bacabal"],
-    MT: ["Cuiaba", "Varzea Grande", "Rondonopolis", "Sinop", "Tangara da Serra"],
-    MS: ["Campo Grande", "Dourados", "Tres Lagoas", "Corumba", "Ponta Pora"],
-    MG: ["Belo Horizonte", "Uberlandia", "Contagem", "Juiz de Fora", "Montes Claros"],
-    PA: ["Belem", "Ananindeua", "Santarem", "Maraba", "Parauapebas"],
-    PB: ["Joao Pessoa", "Campina Grande", "Santa Rita", "Patos", "Bayeux"],
-    PR: ["Curitiba", "Londrina", "Maringa", "Ponta Grossa", "Cascavel"],
-    PE: ["Recife", "Jaboatao dos Guararapes", "Olinda", "Caruaru", "Petrolina"],
-    PI: ["Teresina", "Parnaiba", "Picos", "Floriano", "Piripiri"],
-    RJ: ["Rio de Janeiro", "Niteroi", "Duque de Caxias", "Nova Iguacu", "Petropolis"],
-    RN: ["Natal", "Mossoro", "Parnamirim", "Caico", "Macau"],
-    RS: ["Porto Alegre", "Caxias do Sul", "Pelotas", "Canoas", "Santa Maria"],
-    RO: ["Porto Velho", "Ji-Parana", "Ariquemes", "Vilhena", "Cacoal"],
-    RR: ["Boa Vista", "Rorainopolis", "Caracarai", "Alto Alegre", "Mucajai"],
+const localidadesNomesBrasil = {
     SC: [
-        "Abdon Batista", "Abelardo Luz", "Agrolândia", "Agronômica", "Água Doce",
-        "Águas de Chapecó", "Águas Frias", "Águas Mornas", "Alfredo Wagner",
-        "Alto Bela Vista", "Anchieta", "Angelina", "Anita Garibaldi", "Anitápolis",
-        "Antônio Carlos", "Apiúna", "Arabutã", "Araquari", "Araranguá", "Armazém",
-        "Arroio Trinta", "Arvoredo", "Ascurra", "Atalanta", "Aurora",
-        "Balneário Arroio do Silva", "Balneário Camboriú", "Balneário Barra do Sul",
-        "Balneário Gaivota", "Bandeirante", "Barra Bonita", "Barra Velha",
-        "Bela Vista do Toldo", "Belmonte", "Benedito Novo", "Biguaçu", "Blumenau",
-        "Bocaina do Sul", "Bombinhas", "Bom Jardim da Serra", "Bom Jesus",
-        "Bom Jesus do Oeste", "Bom Retiro", "Botuverá", "Braço do Norte",
-        "Braço do Trombudo", "Brunópolis", "Brusque", "Caçador", "Caibi",
-        "Calmon", "Camboriú", "Capão Alto", "Campo Alegre", "Campo Belo do Sul",
-        "Campo Erê", "Campos Novos", "Canelinha", "Canoinhas", "Capinzal",
-        "Capivari de Baixo", "Catanduvas", "Caxambu do Sul", "Celso Ramos",
-        "Cerro Negro", "Chapadão do Lageado", "Chapecó", "Cocal do Sul",
-        "Concórdia", "Cordilheira Alta", "Coronel Freitas", "Coronel Martins",
-        "Corupá", "Correia Pinto", "Criciúma", "Cunha Porã", "Cunhataí",
-        "Curitibanos", "Descanso", "Dionísio Cerqueira", "Dona Emma",
-        "Doutor Pedrinho", "Entre Rios", "Ermo", "Erval Velho",
-        "Faxinal dos Guedes", "Flor do Sertão", "Florianópolis", "Formosa do Sul",
-        "Forquilhinha", "Fraiburgo", "Frei Rogério", "Galvão", "Garopaba",
-        "Garuva", "Gaspar", "Governador Celso Ramos", "Grão-Pará", "Gravatal",
-        "Guabiruba", "Guaraciaba", "Guaramirim", "Guarujá do Sul", "Guatambú",
-        "Herval d'Oeste", "Ibiam", "Ibicaré", "Ibirama", "Içara", "Ilhota",
-        "Imaruí", "Imbituba", "Imbuia", "Indaial", "Iomerê", "Ipira",
-        "Iporã do Oeste", "Ipuaçu", "Ipumirim", "Iraceminha", "Irani", "Irati",
-        "Irineópolis", "Itá", "Itaiópolis", "Itajaí", "Itapema", "Itapiranga",
-        "Itapoá", "Ituporanga", "Jaborá", "Jacinto Machado", "Jaguaruna",
-        "Jaraguá do Sul", "Jardinópolis", "Joaçaba", "Joinville",
-        "José Boiteux", "Jupiá", "Lacerdópolis", "Lages", "Laguna",
-        "Lajeado Grande", "Laurentino", "Lauro Müller", "Lebon Régis",
-        "Leoberto Leal", "Lindóia do Sul", "Lontras", "Luiz Alves", "Luzerna",
-        "Macieira", "Mafra", "Major Gercino", "Major Vieira", "Maracajá",
-        "Maravilha", "Marema", "Massaranduba", "Matos Costa", "Meleiro",
-        "Mirim Doce", "Modelo", "Mondaí", "Monte Carlo", "Monte Castelo",
-        "Morro da Fumaça", "Morro Grande", "Navegantes", "Nova Erechim",
-        "Nova Itaberaba", "Nova Trento", "Nova Veneza", "Novo Horizonte",
-        "Orleans", "Otacílio Costa", "Ouro", "Ouro Verde", "Paial", "Painel",
-        "Palhoça", "Palma Sola", "Palmeira", "Palmitos", "Papanduva", "Paraíso",
-        "Passo de Torres", "Passos Maia", "Paulo Lopes", "Pedras Grandes",
-        "Penha", "Peritiba", "Pescaria Brava", "Petrolândia",
-        "Balneário Piçarras", "Pinhalzinho", "Pinheiro Preto", "Piratuba",
-        "Planalto Alegre", "Pomerode", "Ponte Alta", "Ponte Alta do Norte",
-        "Ponte Serrada", "Porto Belo", "Porto União", "Pouso Redondo",
-        "Praia Grande", "Presidente Castello Branco", "Presidente Getúlio",
-        "Presidente Nereu", "Princesa", "Quilombo", "Rancho Queimado",
-        "Rio das Antas", "Rio do Campo", "Rio do Oeste", "Rio dos Cedros",
-        "Rio do Sul", "Rio Fortuna", "Rio Negrinho", "Rio Rufino", "Riqueza",
-        "Rodeio", "Romelândia", "Salete", "Saltinho", "Salto Veloso", "Sangão",
-        "Santa Cecília", "Santa Helena", "Santa Rosa de Lima", "Santa Rosa do Sul",
-        "Santa Terezinha", "Santa Terezinha do Progresso", "Santiago do Sul",
-        "Santo Amaro da Imperatriz", "São Bernardino", "São Bento do Sul",
-        "São Bonifácio", "São Carlos", "São Cristóvão do Sul", "São Domingos",
-        "São Francisco do Sul", "São João do Oeste", "São João Batista",
-        "São João do Itaperiú", "São João do Sul", "São Joaquim", "São José",
-        "São José do Cedro", "São José do Cerrito", "São Lourenço do Oeste",
-        "São Ludgero", "São Martinho", "São Miguel da Boa Vista",
-        "São Miguel do Oeste", "São Pedro de Alcântara", "Saudades", "Schroeder",
-        "Seara", "Serra Alta", "Siderópolis", "Sombrio", "Sul Brasil", "Taió",
-        "Tangará", "Tigrinhos", "Tijucas", "Timbé do Sul", "Timbó",
-        "Timbó Grande", "Três Barras", "Treviso", "Treze de Maio",
-        "Treze Tílias", "Trombudo Central", "Tubarão", "Tunápolis", "Turvo",
-        "União do Oeste", "Urubici", "Urupema", "Urussanga", "Vargeão", "Vargem",
-        "Vargem Bonita", "Vidal Ramos", "Videira", "Vitor Meireles", "Witmarsum",
-        "Xanxerê", "Xavantina", "Xaxim", "Zortéa", "Balneário Rincão",
+        "Lebon R\u00e9gis",
+        "Ca\u00e7ador",
+        "Fraiburgo",
+        "Curitibanos",
+        "Campos Novos",
+        "Lages",
+        "Chapec\u00f3",
+        "Joinville",
+        "Blumenau",
+        "Florian\u00f3polis",
     ],
-    SP: ["Sao Paulo", "Campinas", "Santos", "Ribeirao Preto", "Sao Jose dos Campos,Bauru"],
-    SE: ["Aracaju", "Nossa Senhora do Socorro", "Lagarto", "Itabaiana", "Estancia"],
-    TO: ["Palmas", "Araguaina", "Gurupi", "Porto Nacional", "Paraiso do Tocantins"],
+    PR: ["Curitiba"],
+    RS: ["Porto Alegre"],
+    SP: ["S\u00e3o Paulo"],
+    DF: ["Bras\u00edlia"],
+    RJ: ["Rio de Janeiro"],
 };
+
+const distanciasLocalidadesKm = {
+    // Distancias rodoviarias aproximadas para demonstracao academica.
+    "SC|Lebon R\u00e9gis": 0,
+    "SC|Ca\u00e7ador": 50,
+    "SC|Fraiburgo": 55,
+    "SC|Curitibanos": 85,
+    "SC|Campos Novos": 135,
+    "SC|Lages": 165,
+    "SC|Chapec\u00f3": 240,
+    "SC|Joinville": 300,
+    "SC|Blumenau": 300,
+    "SC|Florian\u00f3polis": 320,
+    "PR|Curitiba": 260,
+    "RS|Porto Alegre": 500,
+    "SP|S\u00e3o Paulo": 650,
+    "DF|Bras\u00edlia": 1500,
+    "RJ|Rio de Janeiro": 1102,
+};
+
+function normalizarNomeMunicipio(nome) {
+    return nome.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+const localidadesBrasil = Object.fromEntries(
+    Object.entries(localidadesNomesBrasil).map(([uf, cidades]) => [
+        uf,
+        cidades.map((nome) => {
+            const distancia = Object.prototype.hasOwnProperty.call(distanciasLocalidadesKm, `${uf}|${nome}`)
+                ? distanciasLocalidadesKm[`${uf}|${nome}`]
+                : null;
+            return {
+                nome,
+                cidade: nome,
+                uf,
+                distancia_km: distancia,
+                distanciaKm: distancia,
+                capitalEstadual: uf === "SC" && normalizarNomeMunicipio(nome) === "florianopolis",
+                capitalFederal: uf === "DF" && normalizarNomeMunicipio(nome) === "brasilia",
+            };
+        }),
+    ])
+);
 
 const nomesEstados = {
     AC: "Acre",
@@ -127,6 +94,7 @@ const nomesEstados = {
 const campoEstado = document.querySelector("#stateSelect");
 const campoCidade = document.querySelector("#citySelect");
 const campoDestino = document.querySelector("#destinationInput");
+const campoDistanciaDestino = document.querySelector("#destinationDistance");
 
 function definirOpcoes(campo, opcoes, textoInicial) {
     campo.innerHTML = "";
@@ -134,17 +102,48 @@ function definirOpcoes(campo, opcoes, textoInicial) {
     opcoes.forEach((opcao) => campo.append(new Option(opcao.label, opcao.value)));
 }
 
+function obterLocalidadeSelecionada() {
+    if (!campoEstado?.value || !campoCidade?.value) {
+        return null;
+    }
+    return (localidadesBrasil[campoEstado.value] || []).find(
+        (cidade) => cidade.nome === campoCidade.value
+    ) || null;
+}
+
+function formatarDistanciaDestino(localidade) {
+    if (!localidade) {
+        return "Distância aproximada de Lebon Régis: -";
+    }
+    const distancia = localidade.distancia_km;
+    if (distancia === null || distancia === undefined || distancia === "") {
+        return "Distância aproximada de Lebon Régis: não cadastrada";
+    }
+    return `Distância aproximada de Lebon Régis: ${Number(distancia).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} km`;
+}
+
+function atualizarDistanciaDestino(localidade) {
+    if (campoDistanciaDestino) {
+        campoDistanciaDestino.textContent = formatarDistanciaDestino(localidade);
+    }
+}
+
 function atualizarDestino() {
     if (!campoEstado.value || !campoCidade.value) {
         campoDestino.value = "";
+        atualizarDistanciaDestino(null);
+        document.dispatchEvent(new CustomEvent("localidade:alterada", { detail: null }));
         return;
     }
+    const localidade = obterLocalidadeSelecionada();
     campoDestino.value = `${campoCidade.value} - ${campoEstado.value}`;
+    atualizarDistanciaDestino(localidade);
+    document.dispatchEvent(new CustomEvent("localidade:alterada", { detail: localidade }));
 }
 
 function preencherCidades() {
     const uf = campoEstado.value;
-    const cidades = (localidadesBrasil[uf] || []).map((cidade) => ({ label: cidade, value: cidade }));
+    const cidades = (localidadesBrasil[uf] || []).map((cidade) => ({ label: cidade.nome, value: cidade.nome }));
 
     campoCidade.disabled = cidades.length === 0;
     definirOpcoes(
@@ -176,3 +175,8 @@ if (campoEstado && campoCidade && campoDestino) {
         atualizarDestino();
     }
 }
+
+window.localidadesBrasil = localidadesBrasil;
+window.distanciasLocalidadesKm = distanciasLocalidadesKm;
+window.obterLocalidadeSelecionada = obterLocalidadeSelecionada;
+window.formatarDistanciaDestino = formatarDistanciaDestino;

@@ -1,5 +1,8 @@
+import json
 import os
+import re
 import sqlite3
+import unicodedata
 from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
@@ -21,6 +24,7 @@ from werkzeug.utils import secure_filename
 
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE = BASE_DIR / "diarias.db"
+LOCALITIES_FILE = BASE_DIR / "static" / "localidades.js"
 UPLOAD_FOLDER = BASE_DIR / "uploads"
 ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "doc", "docx"}
 ACCOUNTABILITY_ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg"}
@@ -31,8 +35,8 @@ app.config["SECRET_KEY"] = "chave-academica-altere-em-producao"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 DAILY_GROUPS = {
-    "agente_politico_comissionado": "Prefeito, Vice-Prefeito, Vereadores, Secretários e Cargos Comissionados",
-    "servidor_geral": "Demais servidores efetivos, contratados ou temporários",
+    "agente_politico_comissionado": "Prefeito Municipal, Vice-Prefeito, Vereadores e Secretários",
+    "servidor_geral": "Demais servidores efetivos, contratados, temporários e cargos em comissão",
 }
 
 DAILY_RANGES = {
@@ -40,20 +44,20 @@ DAILY_RANGES = {
     "sc_acima_200": "Acima de 200 km dentro de Santa Catarina",
     "capital_sc_ou_fora_ate_1000": "Capital de SC ou fora do Estado até 1000 km",
     "capital_federal_ou_acima_1000": "Capital Federal ou acima de 1000 km",
-    "acima_1000": "Acima de 1000 km",
 }
 
 DAILY_RATES = {
     "agente_politico_comissionado": {
         "sc_ate_200": 300.00,
-        "sc_acima_200": 400.00,
-        "capital_sc_ou_fora_ate_1000": 500.00,
-        "capital_federal_ou_acima_1000": 1300.00,
+        "sc_acima_200": 600.00,
+        "capital_sc_ou_fora_ate_1000": 700.00,
+        "capital_federal_ou_acima_1000": 1500.00,
     },
     "servidor_geral": {
-        "sc_ate_200": 205.00,
-        "sc_acima_200": 237.00,
-        "acima_1000": 809.00,
+        "sc_ate_200": 300.00,
+        "sc_acima_200": 500.00,
+        "capital_sc_ou_fora_ate_1000": 800.00,
+        "capital_federal_ou_acima_1000": 1300.00,
     },
 }
 
@@ -154,6 +158,11 @@ def init_db():
             "departure_km": "REAL",
             "arrival_km": "REAL",
             "refund_amount": "REAL DEFAULT 0",
+            "departure_time": "TEXT",
+            "return_time": "TEXT",
+            "distance_km": "REAL",
+            "daily_factor": "REAL",
+            "base_amount": "REAL",
         }
         for column_name, column_definition in columns_to_add.items():
             if column_name not in existing_columns:
@@ -203,6 +212,18 @@ def init_db():
                 WHERE role = 'solicitante'
                 """
             )
+            db.execute(
+                """
+                UPDATE users
+                SET daily_group = 'servidor_geral'
+                WHERE daily_group = 'agente_politico_comissionado'
+                  AND role = 'solicitante'
+                  AND LOWER(COALESCE(public_position, '')) LIKE '%comission%'
+                  AND LOWER(COALESCE(public_position, '')) NOT LIKE '%secret%'
+                  AND LOWER(COALESCE(public_position, '')) NOT LIKE '%prefeit%'
+                  AND LOWER(COALESCE(public_position, '')) NOT LIKE '%vereador%'
+                """
+            )
 
 
 def current_user():
@@ -223,19 +244,56 @@ def inject_user():
     }
 
 
-def calculate_travel_days(departure_date, return_date):
-    departure = datetime.fromisoformat(departure_date).date()
-    return_ = datetime.fromisoformat(return_date).date()
-    return (return_ - departure).days + 1
+def load_locality_distances():
+    if not LOCALITIES_FILE.exists():
+        return {}
+    source = LOCALITIES_FILE.read_text(encoding="utf-8")
+    match = re.search(r"const\s+distanciasLocalidadesKm\s*=\s*(\{.*?\});", source, re.S)
+    if not match:
+        return {}
+    try:
+        return json.loads(match.group(1))
+    except json.JSONDecodeError:
+        return {}
 
 
-def calculate_daily_amount(daily_group, daily_range, has_overnight, travel_days=1):
-    base_amount = DAILY_RATES.get(daily_group, {}).get(daily_range)
-    if base_amount is None:
-        raise ValueError("Enquadramento de diária inválido.")
-    if not has_overnight:
-        base_amount = base_amount / 2
-    return base_amount * travel_days
+def locality_key(state, city):
+    return f"{state}|{city}"
+
+
+def normalize_name(value):
+    normalized = unicodedata.normalize("NFD", value or "")
+    return "".join(char for char in normalized if unicodedata.category(char) != "Mn").lower()
+
+
+def is_state_capital(state, city):
+    return state == "SC" and normalize_name(city) == "florianopolis"
+
+
+def is_federal_capital(state, city):
+    return state == "DF" and normalize_name(city) == "brasilia"
+
+
+def get_destination_distance(state, city):
+    distances = load_locality_distances()
+    value = distances.get(locality_key(state, city))
+    if value is None:
+        return None
+    return float(value)
+
+
+def determine_daily_range(state, city, distance_km):
+    if is_federal_capital(state, city):
+        return "capital_federal_ou_acima_1000"
+    if is_state_capital(state, city):
+        return "capital_sc_ou_fora_ate_1000"
+    if distance_km is None:
+        raise ValueError("A distância rodoviária do município selecionado ainda não foi cadastrada.")
+    if distance_km > 1000:
+        return "capital_federal_ou_acima_1000"
+    if state == "SC":
+        return "sc_ate_200" if distance_km <= 200 else "sc_acima_200"
+    return "capital_sc_ou_fora_ate_1000"
 
 
 def parse_destination(destination):
@@ -255,15 +313,54 @@ def parse_form_date(value):
     raise ValueError("Data inválida. Use o formato DD/MM/AA.")
 
 
-def validate_travel_dates(departure_date, return_date):
-    departure = datetime.fromisoformat(departure_date).date()
-    return_ = datetime.fromisoformat(return_date).date()
+def parse_form_time(value, field_label):
+    value = (value or "").strip()
+    try:
+        datetime.strptime(value, "%H:%M")
+    except ValueError:
+        raise ValueError(f"Informe {field_label} no formato 24 horas HH:MM.")
+    return value
+
+
+def build_travel_datetimes(departure_date, departure_time, return_date, return_time):
+    departure = datetime.fromisoformat(f"{departure_date}T{departure_time}")
+    return_ = datetime.fromisoformat(f"{return_date}T{return_time}")
+    return departure, return_
+
+
+def validate_travel_period(departure_date, departure_time, return_date, return_time):
+    departure, return_ = build_travel_datetimes(
+        departure_date,
+        departure_time,
+        return_date,
+        return_time,
+    )
     today = datetime.now().date()
 
-    if departure < today:
+    if departure.date() < today:
         raise ValueError("A data de saída não pode ser anterior à data de hoje.")
-    if return_ < departure:
-        raise ValueError("A data de retorno não pode ser inferior à data de saída.")
+    if return_ <= departure:
+        raise ValueError("O retorno não pode ocorrer antes ou no mesmo momento da saída.")
+    return (return_ - departure).total_seconds() / 3600
+
+
+def calculate_daily_factor(duration_hours, has_overnight):
+    if has_overnight:
+        if duration_hours <= 12:
+            raise ValueError("Pernoite só pode ser informado para deslocamentos superiores a 12 horas.")
+        return 1.0
+    if duration_hours > 12:
+        return 0.7
+    if duration_hours < 12:
+        return 0.5
+    raise ValueError("A legislação informada não define fator para deslocamento exatamente igual a 12 horas.")
+
+
+def calculate_daily_amount(daily_group, daily_range, daily_factor):
+    base_amount = DAILY_RATES.get(daily_group, {}).get(daily_range)
+    if base_amount is None:
+        raise ValueError("Enquadramento de diária inválido.")
+    return base_amount, base_amount * daily_factor
 
 
 def get_overdue_accountability(user_id):
@@ -288,21 +385,33 @@ def get_overdue_accountability(user_id):
 
 def calculate_request_amount(user, form):
     daily_group = user["daily_group"]
-    daily_range = form["daily_range"]
     has_overnight = form.get("has_overnight") == "1"
 
     if daily_group not in DAILY_RATES:
         raise ValueError("Seu usuário não possui grupo de diária cadastrado. Procure o validador.")
 
+    destination = form.get("destination", "").strip()
+    state, city = parse_destination(destination)
+    if not state or not city:
+        raise ValueError("Selecione o município de destino.")
+
     departure_date = parse_form_date(form["departure_date"])
     return_date = parse_form_date(form["return_date"])
-    validate_travel_dates(departure_date, return_date)
-    travel_days = calculate_travel_days(departure_date, return_date)
-    estimated_amount = calculate_daily_amount(
+    departure_time = parse_form_time(form.get("departure_time"), "a hora de saída")
+    return_time = parse_form_time(form.get("return_time"), "a hora prevista de retorno")
+    duration_hours = validate_travel_period(
+        departure_date,
+        departure_time,
+        return_date,
+        return_time,
+    )
+    distance_km = get_destination_distance(state, city)
+    daily_range = determine_daily_range(state, city, distance_km)
+    daily_factor = calculate_daily_factor(duration_hours, has_overnight)
+    base_amount, estimated_amount = calculate_daily_amount(
         daily_group,
         daily_range,
-        has_overnight,
-        travel_days,
+        daily_factor,
     )
 
     return {
@@ -311,7 +420,13 @@ def calculate_request_amount(user, form):
         "has_overnight": has_overnight,
         "departure_date": departure_date,
         "return_date": return_date,
+        "departure_time": departure_time,
+        "return_time": return_time,
+        "distance_km": distance_km,
+        "daily_factor": daily_factor,
+        "base_amount": base_amount,
         "estimated_amount": estimated_amount,
+        "duration_hours": duration_hours,
     }
 
 
@@ -360,6 +475,30 @@ def moeda_br(value):
     amount = float(value or 0)
     formatted = f"{amount:,.2f}"
     return formatted.replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+@app.template_filter("decimal_br")
+def decimal_br(value, places=1):
+    if value is None:
+        return "-"
+    return f"{float(value):.{places}f}".replace(".", ",")
+
+
+@app.template_filter("duration_br")
+def duration_br(daily_request):
+    if not daily_request["departure_time"] or not daily_request["return_time"]:
+        return "-"
+    departure, return_ = build_travel_datetimes(
+        daily_request["departure_date"],
+        daily_request["departure_time"],
+        daily_request["return_date"],
+        daily_request["return_time"],
+    )
+    total_minutes = int((return_ - departure).total_seconds() // 60)
+    if total_minutes < 0:
+        return "-"
+    hours, minutes = divmod(total_minutes, 60)
+    return f"{hours}h{minutes:02d}"
 
 
 @app.template_filter("status_label")
@@ -823,9 +962,10 @@ def new_request():
                 INSERT INTO requests (
                     user_id, destination, departure_date, return_date, objective,
                     estimated_amount, daily_group, daily_range, has_overnight,
+                    departure_time, return_time, distance_km, daily_factor, base_amount,
                     status, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'enviada', ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'enviada', ?, ?)
                 """,
                 (
                     user["id"],
@@ -837,6 +977,11 @@ def new_request():
                     calculated["daily_group"],
                     calculated["daily_range"],
                     1 if calculated["has_overnight"] else 0,
+                    calculated["departure_time"],
+                    calculated["return_time"],
+                    calculated["distance_km"],
+                    calculated["daily_factor"],
+                    calculated["base_amount"],
                     now,
                     now,
                 ),
@@ -876,6 +1021,7 @@ def edit_request(request_id):
                 UPDATE requests
                 SET destination = ?, departure_date = ?, return_date = ?, objective = ?,
                     estimated_amount = ?, daily_group = ?, daily_range = ?, has_overnight = ?,
+                    departure_time = ?, return_time = ?, distance_km = ?, daily_factor = ?, base_amount = ?,
                     status = 'corrigida', updated_at = ?
                 WHERE id = ?
                 """,
@@ -888,6 +1034,11 @@ def edit_request(request_id):
                     calculated["daily_group"],
                     calculated["daily_range"],
                     1 if calculated["has_overnight"] else 0,
+                    calculated["departure_time"],
+                    calculated["return_time"],
+                    calculated["distance_km"],
+                    calculated["daily_factor"],
+                    calculated["base_amount"],
                     datetime.now().isoformat(timespec="seconds"),
                     request_id,
                 ),

@@ -15,8 +15,16 @@
         <span>{{ daily_request["destination"] }}</span>
     </div>
     <div>
+        <strong>Distância considerada</strong>
+        <span>{{ (daily_request["distance_km"]|decimal_br(0) ~ " km") if daily_request["distance_km"] is not none else "n?o cadastrada" }}</span>
+    </div>
+    <div>
         <strong>Período</strong>
-        <span>{{ daily_request["departure_date"]|date_br }} a {{ daily_request["return_date"]|date_br }}</span>
+        <span>{{ daily_request["departure_date"]|date_br }} {{ daily_request["departure_time"] or "--:--" }} a {{ daily_request["return_date"]|date_br }} {{ daily_request["return_time"] or "--:--" }}</span>
+    </div>
+    <div>
+        <strong>Duração prevista</strong>
+        <span>{{ daily_request|duration_br }}</span>
     </div>
     <div>
         <strong>Valor total da diária</strong>
@@ -30,16 +38,22 @@
     {% endif %}
     {% if daily_request["daily_range"] %}
         <div>
-            <strong>Enquadramento</strong>
+            <strong>Faixa identificada pelo sistema</strong>
             <span>{{ daily_ranges.get(daily_request["daily_range"], daily_request["daily_range"]) }}</span>
         </div>
     {% endif %}
-    {% if daily_request["has_overnight"] is not none %}
-        <div>
-            <strong>Tipo de diária</strong>
-            <span>{{ "Integral, com estadia" if daily_request["has_overnight"] else "Meia diária, sem estadia" }}</span>
-        </div>
-    {% endif %}
+    <div>
+        <strong>Pernoite</strong>
+        <span>{{ "Sim" if daily_request["has_overnight"] else "Não" }}</span>
+    </div>
+    <div>
+        <strong>Fator aplicado</strong>
+        <span>{{ daily_request["daily_factor"]|decimal_br(2) }}</span>
+    </div>
+    <div>
+        <strong>Valor-base</strong>
+        <span>{{ ("R$ " ~ (daily_request["base_amount"]|moeda_br)) if daily_request["base_amount"] is not none else "-" }}</span>
+    </div>
     <div>
         <strong>Objetivo</strong>
         <span>{{ daily_request["objective"] }}</span>
@@ -50,7 +64,7 @@
             <span>{{ daily_request["accountability_text"] }}</span>
         </div>
         <div>
-            <strong>Horários da viagem</strong>
+            <strong>Horários informados na prestação</strong>
             <span>{{ daily_request["accountability_departure_time"] or "-" }} a {{ daily_request["accountability_arrival_time"] or "-" }}</span>
         </div>
         <div>

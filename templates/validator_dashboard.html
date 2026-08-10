@@ -35,6 +35,8 @@
             <tr>
                 <th>Solicitante</th>
                 <th>Destino</th>
+                <th>Período</th>
+                <th>Valor</th>
                 <th>Atualização</th>
                 <th>Status</th>
                 <th>Ação</th>
@@ -45,13 +47,15 @@
                 <tr>
                     <td>{{ item["requester_name"] }}</td>
                     <td>{{ item["destination"] }}</td>
+                    <td>{{ item["departure_date"]|date_br }} {{ item["departure_time"] or "--:--" }} a {{ item["return_date"]|date_br }} {{ item["return_time"] or "--:--" }}</td>
+                    <td>R$ {{ item["estimated_amount"]|moeda_br }}</td>
                     <td>{{ item["updated_at"]|datetime_br }}</td>
                     <td><span class="badge {{ item['status']|status_class }}">{{ item["status"]|status_label }}</span></td>
                     <td><a href="{{ url_for('request_detail', request_id=item['id']) }}">Avaliar</a></td>
                 </tr>
             {% else %}
                 <tr>
-                    <td colspan="5" class="empty">Nenhuma solicitação recebida.</td>
+                    <td colspan="7" class="empty">Nenhuma solicitação recebida.</td>
                 </tr>
             {% endfor %}
         </tbody>
