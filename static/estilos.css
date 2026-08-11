@@ -386,9 +386,12 @@ button:hover,
 
 .secondary,
 .button.secondary {
-    margin-top: 24px;
     background: #ffffff;
     color: var(--primary);
+}
+
+.button-back {
+    margin-top: 24px;
 }
 
 .secondary:hover,
