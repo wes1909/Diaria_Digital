@@ -11,6 +11,19 @@ O sistema permite gerenciar solicitacoes de diarias em ambiente academico/local,
 - **Servidor solicitante**: cadastra solicitacoes de diaria, corrige solicitacoes quando solicitado, envia prestacao de contas e acompanha o status.
 - **Servidor validador**: cadastra e edita servidores, analisa solicitacoes, aprova, rejeita, solicita correcoes e avalia prestacoes de contas.
 
+## Autenticacao e Usuarios Demonstrativos
+
+O sistema utiliza CPF + senha para autenticar usuarios. O CPF e o identificador funcional de login e cadastro, enquanto a coluna antiga `email` pode permanecer no SQLite apenas como legado tecnico. Ela nao e usada no login, na pesquisa ou na interface.
+
+O CPF e normalizado no backend por `normalize_cpf()`, ficando salvo apenas com digitos, por exemplo `11111111111`. A interface usa `static/cpf.js` para exibir e preencher a mascara `000.000.000-00` no login e no formulario de servidores.
+
+Por se tratar de uma versao academica de demonstracao, os CPFs sao ficticios e a validacao confere somente presenca e 11 digitos apos a normalizacao. Nao e feita validacao matematica dos digitos verificadores oficiais.
+
+Usuarios demonstrativos recriados na base limpa:
+
+- Servidor Solicitante: CPF `111.111.111-11`, senha `123456`.
+- Servidor Validador: CPF `222.222.222-22`, senha `123456`.
+
 ## Fluxo Principal
 
 1. O solicitante acessa o sistema.
@@ -120,6 +133,7 @@ Nao foram inseridas distancias ficticias. Os municipios que nao possuem valor co
 - `static/restricoes_datas.js`: regras visuais para datas da solicitacao.
 - `static/prestacao.js`: mascaras e regras visuais da prestacao de contas.
 - `static/campos_obrigatorios.js`: validacao visual de campos obrigatorios.
+- `static/cpf.js`: mascara visual de CPF no login e no cadastro de servidores.
 - `static/estilos.css`: estilos e responsividade.
 
 ## Glossario de Nomes Tecnicos
@@ -153,6 +167,7 @@ Nao foram inseridas distancias ficticias. Os municipios que nao possuem valor co
 | `attachments` | Anexos ou comprovantes |
 | `registration` | Matricula do servidor |
 | `public_position` | Cargo, emprego ou funcao |
+| `cpf` | CPF normalizado do usuario, usado para login |
 
 ## Status Utilizados
 

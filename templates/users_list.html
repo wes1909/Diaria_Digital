@@ -21,7 +21,7 @@
     </label>
     <label>
         Buscar
-        <input type="search" name="q" value="{{ search }}" placeholder="Nome, e-mail ou matrícula">
+        <input type="search" name="q" value="{{ search }}" placeholder="Nome, CPF ou matricula">
     </label>
     <div class="filter-actions">
         <button type="submit">Filtrar</button>
@@ -37,7 +37,7 @@
                 <th>Nome</th>
                 <th>Matrícula</th>
                 <th>Cargo/Função</th>
-                <th>E-mail</th>
+                <th>CPF</th>
                 <th>Perfil</th>
                 <th>Ação</th>
             </tr>
@@ -48,7 +48,7 @@
                     <td>{{ item["name"] }}</td>
                     <td>{{ item["registration"] or "-" }}</td>
                     <td>{{ item["public_position"] or "-" }}</td>
-                    <td>{{ item["email"] }}</td>
+                    <td>{{ item["cpf"]|cpf_br if item["cpf"] else "-" }}</td>
                     <td>{{ role_labels.get(item["role"], item["role"]) }}</td>
                     <td><a href="{{ url_for('edit_user', user_id=item['id']) }}">Editar</a></td>
                 </tr>

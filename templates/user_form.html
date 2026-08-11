@@ -27,8 +27,8 @@
             <input name="public_position" required value="{{ user['public_position'] if user else '' }}">
         </label>
         <label class="required">
-            E-mail
-            <input type="email" name="email" required value="{{ user['email'] if user else '' }}">
+            CPF
+            <input type="text" name="cpf" class="cpf-mask" maxlength="14" inputmode="numeric" autocomplete="username" required placeholder="000.000.000-00" value="{{ user['cpf']|cpf_br if user else '' }}">
         </label>
         <label class="{% if not is_edit %}required{% endif %}">
             Senha
@@ -75,5 +75,6 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='cpf.js') }}"></script>
 <script src="{{ url_for('static', filename='campos_obrigatorios.js') }}"></script>
 {% endblock %}

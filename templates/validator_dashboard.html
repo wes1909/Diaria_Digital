@@ -45,13 +45,13 @@
         <tbody>
             {% for item in requests %}
                 <tr>
-                    <td>{{ item["requester_name"] }}</td>
-                    <td>{{ item["destination"] }}</td>
-                    <td>{{ item["departure_date"]|date_br }} {{ item["departure_time"] or "--:--" }} a {{ item["return_date"]|date_br }} {{ item["return_time"] or "--:--" }}</td>
-                    <td>R$ {{ item["estimated_amount"]|moeda_br }}</td>
-                    <td>{{ item["updated_at"]|datetime_br }}</td>
-                    <td><span class="badge {{ item['status']|status_class }}">{{ item["status"]|status_label }}</span></td>
-                    <td><a href="{{ url_for('request_detail', request_id=item['id']) }}">Avaliar</a></td>
+                    <td data-label="Solicitante">{{ item["requester_name"] }}</td>
+                    <td data-label="Destino">{{ item["destination"] }}</td>
+                    <td data-label="Período">{{ item["departure_date"]|date_br }} {{ item["departure_time"] or "--:--" }} a {{ item["return_date"]|date_br }} {{ item["return_time"] or "--:--" }}</td>
+                    <td data-label="Valor">R$ {{ item["estimated_amount"]|moeda_br }}</td>
+                    <td data-label="Atualização">{{ item["updated_at"]|datetime_br }}</td>
+                    <td data-label="Status"><span class="badge {{ item['status']|status_class }}">{{ item["status"]|status_label }}</span></td>
+                    <td data-label="Ação"><a href="{{ url_for('request_detail', request_id=item['id']) }}">Avaliar</a></td>
                 </tr>
             {% else %}
                 <tr>

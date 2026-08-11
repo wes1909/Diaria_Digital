@@ -4,7 +4,7 @@
 <div class="page-heading">
     <div>
         <h1>Solicitação #{{ daily_request["id"] }}</h1>
-        <p class="muted">{{ daily_request["requester_name"] }} · {{ daily_request["requester_email"] }}</p>
+        <p class="muted">{{ daily_request["requester_name"] }}</p>
     </div>
     <span class="badge large {{ daily_request['status']|status_class }}">{{ daily_request["status"]|status_label }}</span>
 </div>

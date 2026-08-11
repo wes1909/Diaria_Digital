@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Diária Digital</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}">
+</head>
+<body>
+    <a class="skip-link" href="#conteudo-principal">Pular para o conteúdo principal</a>
+    <header class="topbar public-topbar">
+        <a class="brand" href="{{ url_for('login') }}">Diária Digital</a>
+        <div class="topbar-actions">
+            <button type="button" class="contrast-toggle" data-contrast-toggle aria-pressed="false">
+                ◐ <span>◐ Alto contraste</span>
+            </button>
+        </div>
+    </header>
+
+    <main id="conteudo-principal" class="container public-home" tabindex="-1">
+        <section class="home-hero" aria-labelledby="home-title">
+            <div class="home-hero-content">
+                <h1 id="home-title">Gestão digital de diárias</h1>
+                <p>
+                    O Diária Digital é um sistema desenvolvido com finalidade acadêmica para demonstrar a digitalização do processo de solicitação, análise e prestação de contas de diárias na Administração Pública Municipal.
+                </p>
+            </div>
+        </section>
+
+        <section class="home-section" aria-labelledby="flow-title">
+            <h2 id="flow-title">Como funciona</h2>
+            <ol class="process-flow" aria-label="Fluxo principal do sistema">
+                <li>Solicitação</li>
+                <li>Análise</li>
+                <li>Viagem</li>
+                <li>Prestação de contas</li>
+                <li>Validação</li>
+            </ol>
+            <p class="home-section-text">
+                O sistema acompanha o processo desde a solicitação da diária até a análise final da prestação de contas, mantendo as informações e documentos relacionados à viagem em ambiente digital.
+            </p>
+        </section>
+
+        <section class="home-section" aria-labelledby="profiles-title">
+            <h2 id="profiles-title">Perfis de acesso</h2>
+            <div class="profile-cards">
+                <article class="profile-card">
+                    <h3>Servidor Solicitante</h3>
+                    <p>Perfil destinado ao servidor que necessita realizar uma viagem a serviço da Administração Pública.</p>
+                    <ul>
+                        <li>Realizar uma solicitação de diária;</li>
+                        <li>Informar os dados da viagem;</li>
+                        <li>Acompanhar a situação da solicitação;</li>
+                        <li>Realizar a prestação de contas;</li>
+                        <li>Anexar documentos comprobatórios;</li>
+                        <li>Atender eventuais solicitações de correção.</li>
+                    </ul>
+                </article>
+                <article class="profile-card">
+                    <h3>Servidor Validador</h3>
+                    <p>Perfil destinado ao servidor responsável pela análise das solicitações e das respectivas prestações de contas.</p>
+                    <ul>
+                        <li>Visualizar as solicitações recebidas;</li>
+                        <li>Conferir os dados apresentados;</li>
+                        <li>Aprovar ou solicitar correções;</li>
+                        <li>Analisar a prestação de contas;</li>
+                        <li>Acompanhar o andamento dos processos.</li>
+                    </ul>
+                </article>
+            </div>
+        </section>
+
+        <section class="demo-notice" aria-labelledby="demo-title">
+            <h3 id="demo-title">Ambiente de demonstração</h3>
+            <p>
+                Esta versão do Diária Digital foi desenvolvida para fins acadêmicos e de avaliação da solução proposta. Os dados inseridos neste ambiente devem ser fictícios e não devem conter informações pessoais, bancárias ou documentos reais.
+            </p>
+        </section>
+        <a class="button home-primary-action home-final-action" href="{{ url_for('login') }}">Acessar o sistema</a>
+    </main>
+
+    <footer class="home-footer">
+        <strong>Diária Digital — Projeto acadêmico</strong>
+        <span>Trabalho de Conclusão de Curso — Sistemas de Informação</span>
+    </footer>
+    <script src="{{ url_for('static', filename='acessibilidade.js') }}"></script>
+</body>
+</html>

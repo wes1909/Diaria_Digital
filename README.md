@@ -6,6 +6,19 @@ Projeto academico simples para demonstrar o fluxo de gestao de diarias com dois 
 - Servidor validador: cadastra usuarios, visualiza solicitacoes, confere o calculo automatico, aprova ou solicita correcao.
 - Calculo automatico da diaria por grupo funcional, municipio de destino, distancia cadastrada, faixa legal, duracao prevista e fator de pernoite.
 
+
+## Pagina inicial publica
+
+Ao acessar `/` sem estar autenticado, o sistema exibe uma pagina inicial de apresentacao do Diaria Digital, com resumo do objetivo academico, fluxo principal, perfis de acesso e aviso de ambiente demonstrativo.
+
+O botao `Acessar o sistema` direciona para `/login`. Usuarios autenticados continuam sendo redirecionados automaticamente pela rota `/` para o painel correspondente ao perfil: solicitante ou validador.
+
+## Autenticacao por CPF
+
+A versao demonstrativa usa CPF + senha para acesso. O CPF e armazenado internamente somente com numeros, sem pontos ou hifen, e a interface aplica mascara visual no formato `000.000.000-00`.
+
+A validacao desta versao academica confere presenca e quantidade de 11 digitos apos a normalizacao. Nao ha validacao matematica dos digitos verificadores oficiais do CPF, pois os dados de demonstracao sao ficticios.
+
 ## Regras atuais de calculo
 
 Grupos funcionais:
@@ -92,8 +105,8 @@ python app.py
 
 ## Usuarios de demonstracao
 
-- Solicitante: `solicitante@academico.test` / `123456`
-- Validador: `validador@academico.test` / `123456`
+- Solicitante: `111.111.111-11` / `123456`
+- Validador: `222.222.222-22` / `123456`
 
 ## Observacoes de escopo
 

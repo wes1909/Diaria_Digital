@@ -34,6 +34,11 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = "chave-academica-altere-em-producao"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
+DEMO_REQUESTER_EMAIL = "solicitante@academico.test"
+DEMO_VALIDATOR_EMAIL = "validador@academico.test"
+DEMO_REQUESTER_CPF = "11111111111"
+DEMO_VALIDATOR_CPF = "22222222222"
+
 DAILY_GROUPS = {
     "agente_politico_comissionado": "Prefeito Municipal, Vice-Prefeito, Vereadores e Secretários",
     "servidor_geral": "Demais servidores efetivos, contratados, temporários e cargos em comissão",
@@ -84,6 +89,29 @@ ROLE_LABELS = {
 }
 
 
+def normalize_cpf(cpf):
+    return "".join(ch for ch in (cpf or "") if ch.isdigit())
+
+
+def validate_cpf(cpf):
+    normalized = normalize_cpf(cpf)
+    # Versao demonstrativa: valida somente presenca/formato, sem digitos verificadores oficiais.
+    if len(normalized) != 11:
+        raise ValueError("Informe um CPF com 11 digitos.")
+    return normalized
+
+
+def format_cpf(cpf):
+    digits = normalize_cpf(cpf)
+    if len(digits) != 11:
+        return cpf or ""
+    return f"{digits[:3]}.{digits[3:6]}.{digits[6:9]}-{digits[9:]}"
+
+
+def legacy_email_for_cpf(cpf):
+    return f"{cpf}@cpf.local"
+
+
 def get_db():
     conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
@@ -99,6 +127,7 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 email TEXT NOT NULL UNIQUE,
+                cpf TEXT,
                 password_hash TEXT NOT NULL,
                 role TEXT NOT NULL CHECK(role IN ('solicitante', 'validador')),
                 daily_group TEXT
@@ -138,6 +167,7 @@ def init_db():
         if "daily_group" not in existing_user_columns:
             db.execute("ALTER TABLE users ADD COLUMN daily_group TEXT")
         user_columns_to_add = {
+            "cpf": "TEXT",
             "registration": "TEXT",
             "public_position": "TEXT",
         }
@@ -178,13 +208,14 @@ def init_db():
         if user_count == 0:
             db.executemany(
                 """
-                INSERT INTO users (name, email, password_hash, role, daily_group, registration, public_position)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO users (name, email, cpf, password_hash, role, daily_group, registration, public_position)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
                     (
                         "Servidor Solicitante",
-                        "solicitante@academico.test",
+                        DEMO_REQUESTER_EMAIL,
+                        DEMO_REQUESTER_CPF,
                         generate_password_hash("123456"),
                         "solicitante",
                         "servidor_geral",
@@ -193,7 +224,8 @@ def init_db():
                     ),
                     (
                         "Servidor Validador",
-                        "validador@academico.test",
+                        DEMO_VALIDATOR_EMAIL,
+                        DEMO_VALIDATOR_CPF,
                         generate_password_hash("123456"),
                         "validador",
                         None,
@@ -224,6 +256,34 @@ def init_db():
                   AND LOWER(COALESCE(public_position, '')) NOT LIKE '%vereador%'
                 """
             )
+            db.execute(
+                """
+                UPDATE users
+                SET cpf = ?, password_hash = ?
+                WHERE email = ? OR (role = 'solicitante' AND name = 'Servidor Solicitante')
+                """,
+                (DEMO_REQUESTER_CPF, generate_password_hash("123456"), DEMO_REQUESTER_EMAIL),
+            )
+            db.execute(
+                """
+                UPDATE users
+                SET cpf = ?, password_hash = ?
+                WHERE email = ? OR (role = 'validador' AND name = 'Servidor Validador')
+                """,
+                (DEMO_VALIDATOR_CPF, generate_password_hash("123456"), DEMO_VALIDATOR_EMAIL),
+            )
+
+        users_without_cpf = db.execute(
+            "SELECT id FROM users WHERE cpf IS NULL OR TRIM(cpf) = ''"
+        ).fetchall()
+        for row in users_without_cpf:
+            generated_cpf = f"{90000000000 + row['id']:011d}"
+            db.execute("UPDATE users SET cpf = ? WHERE id = ?", (generated_cpf, row["id"]))
+
+        db.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_cpf "
+            "ON users(cpf) WHERE cpf IS NOT NULL AND cpf != ''"
+        )
 
 
 def current_user():
@@ -231,6 +291,11 @@ def current_user():
         return None
     with get_db() as db:
         return db.execute("SELECT * FROM users WHERE id = ?", (session["user_id"],)).fetchone()
+
+
+@app.template_filter("cpf_br")
+def cpf_br_filter(value):
+    return format_cpf(value)
 
 
 @app.context_processor
@@ -371,11 +436,11 @@ def get_overdue_accountability(user_id):
             SELECT *
             FROM requests
             WHERE user_id = ?
-              AND return_date <= ?
-              AND (
+            AND return_date <= ?
+            AND (
                 (status = 'aprovada' AND (accountability_text IS NULL OR TRIM(accountability_text) = ''))
                 OR status = 'prestacao_correcao_solicitada'
-              )
+            )
             ORDER BY return_date ASC
             LIMIT 1
             """,
@@ -549,17 +614,15 @@ def validate_user_form(form, user_id=None, password_required=False):
     name = form.get("name", "").strip()
     registration = form.get("registration", "").strip()
     public_position = form.get("public_position", "").strip()
-    email = form.get("email", "").strip().lower()
+    cpf = validate_cpf(form.get("cpf", ""))
     password = form.get("password", "")
 
     if not name:
         raise ValueError("Informe o nome.")
     if not registration:
-        raise ValueError("Informe a matrícula.")
+        raise ValueError("Informe a matricula.")
     if not public_position:
-        raise ValueError("Informe o cargo, emprego ou função.")
-    if not email:
-        raise ValueError("Informe o e-mail.")
+        raise ValueError("Informe o cargo, emprego ou funcao.")
     if password_required and not password:
         raise ValueError("Informe a senha.")
     if password and len(password) < 6:
@@ -567,17 +630,17 @@ def validate_user_form(form, user_id=None, password_required=False):
 
     with get_db() as db:
         existing = db.execute(
-            "SELECT id FROM users WHERE email = ? AND (? IS NULL OR id != ?)",
-            (email, user_id, user_id),
+            "SELECT id FROM users WHERE cpf = ? AND (? IS NULL OR id != ?)",
+            (cpf, user_id, user_id),
         ).fetchone()
     if existing:
-        raise ValueError("Já existe usuário cadastrado com este e-mail.")
+        raise ValueError("Ja existe usuario cadastrado com este CPF.")
 
     return {
         "name": name,
         "registration": registration,
         "public_position": public_position,
-        "email": email,
+        "cpf": cpf,
         "password": password,
     }
 
@@ -624,7 +687,7 @@ def get_request_or_404(request_id):
     with get_db() as db:
         daily_request = db.execute(
             """
-            SELECT r.*, u.name AS requester_name, u.email AS requester_email,
+            SELECT r.*, u.name AS requester_name, u.cpf AS requester_cpf,
                    u.registration AS requester_registration,
                    u.public_position AS requester_position
             FROM requests r
@@ -725,9 +788,10 @@ def validate_accountability_form(form, displacement_files, objective_files, atta
 
 @app.route("/")
 def index():
-    if current_user() is None:
-        return redirect(url_for("login"))
-    if current_user()["role"] == "validador":
+    user = current_user()
+    if user is None:
+        return render_template("index.html")
+    if user["role"] == "validador":
         return redirect(url_for("validator_dashboard"))
     return redirect(url_for("requester_dashboard"))
 
@@ -735,11 +799,15 @@ def index():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        email = request.form["email"].strip().lower()
+        cpf = normalize_cpf(request.form.get("cpf", ""))
         password = request.form["password"]
 
+        if len(cpf) != 11:
+            flash("Informe um CPF com 11 digitos.", "danger")
+            return render_template("login.html")
+
         with get_db() as db:
-            user = db.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+            user = db.execute("SELECT * FROM users WHERE cpf = ?", (cpf,)).fetchone()
 
         if user and check_password_hash(user["password_hash"], password):
             session.clear()
@@ -747,7 +815,7 @@ def login():
             flash("Login realizado com sucesso.", "success")
             return redirect(url_for("index"))
 
-        flash("E-mail ou senha inválidos.", "danger")
+        flash("CPF ou senha invalidos.", "danger")
 
     return render_template("login.html")
 
@@ -780,8 +848,9 @@ def users_list():
         filters.append("role = ?")
         params.append(role_filter)
     if search:
-        filters.append("(name LIKE ? OR email LIKE ? OR registration LIKE ?)")
-        params.extend([f"%{search}%", f"%{search}%", f"%{search}%"])
+        normalized_search = normalize_cpf(search)
+        filters.append("(name LIKE ? OR registration LIKE ? OR cpf LIKE ?)")
+        params.extend([f"%{search}%", f"%{search}%", f"%{normalized_search or search}%"])
 
     where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
     with get_db() as db:
@@ -818,16 +887,17 @@ def new_user():
             db.execute(
                 """
                 INSERT INTO users (
-                    name, registration, public_position, email,
+                    name, registration, public_position, email, cpf,
                     password_hash, role, daily_group
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     data["name"],
                     data["registration"],
                     data["public_position"],
-                    data["email"],
+                    legacy_email_for_cpf(data["cpf"]),
+                    data["cpf"],
                     generate_password_hash(data["password"]),
                     role,
                     daily_group,
@@ -873,14 +943,14 @@ def edit_user(user_id):
                 """
                 UPDATE users
                 SET name = ?, registration = ?, public_position = ?,
-                    email = ?, role = ?, daily_group = ?
+                    cpf = ?, role = ?, daily_group = ?
                 WHERE id = ?
                 """,
                 (
                     data["name"],
                     data["registration"],
                     data["public_position"],
-                    data["email"],
+                    data["cpf"],
                     role,
                     daily_group,
                     user_id,

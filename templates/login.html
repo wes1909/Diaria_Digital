@@ -7,8 +7,8 @@
 
     <form method="post" class="form">
         <label>
-            E-mail
-            <input type="email" name="email" required placeholder="Informe seu e-mail">
+            CPF
+            <input type="text" name="cpf" class="cpf-mask" maxlength="14" inputmode="numeric" autocomplete="username" required placeholder="000.000.000-00">
         </label>
         <label>
             Senha
@@ -18,9 +18,13 @@
     </form>
 
     <div class="demo-users">
-        <strong>Usuários de demonstração</strong>
-        <span>Solicitante: solicitante@academico.test / 123456</span>
-        <span>Validador: validador@academico.test / 123456</span>
+        <strong>Usuários de Demonstração</strong>
+        <span>Solicitante: CPF 111.111.111-11 / 123456</span>
+        <span>Validador: CPF 222.222.222-22 / 123456</span>
     </div>
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='cpf.js') }}"></script>
 {% endblock %}
