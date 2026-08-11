@@ -386,6 +386,7 @@ button:hover,
 
 .secondary,
 .button.secondary {
+    margin-top: 24px;
     background: #ffffff;
     color: var(--primary);
 }
@@ -890,6 +891,7 @@ tr:last-child td {
 }
 
 .profile-card {
+    align-content: start;
     background: #f8fafc;
     border: 1px solid var(--line);
     border-radius: 8px;

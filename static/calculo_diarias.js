@@ -55,6 +55,13 @@ function formatarQuantidadeDiarias(valor) {
     return `${texto} ${Math.abs(valor - 1) < 0.001 ? "diária" : "diárias"}`;
 }
 
+function formatarDuracao(valorEmHoras) {
+    const totalMinutos = Math.max(0, Math.round(Number(valorEmHoras) * 60));
+    const horas = Math.floor(totalMinutos / 60);
+    const minutos = totalMinutos % 60;
+    return `${horas}h${String(minutos).padStart(2, "0")}min`;
+}
+
 function obterDatasViagem() {
     if (!campoDataSaidaDiaria?.value || !campoDataRetornoDiaria?.value) {
         return null;
@@ -200,7 +207,7 @@ function atualizarValorDiaria() {
             ? `${formatarNumero(localidade.distanciaKm, 0)} km`
             : "não cadastrada"
     );
-    atualizarTexto(resumoDuracao, duracaoHoras !== null ? `${formatarNumero(duracaoHoras)} horas` : "-");
+    atualizarTexto(resumoDuracao, duracaoHoras !== null ? formatarDuracao(duracaoHoras) : "-");
     atualizarTexto(resumoPernoites, pernoites !== null ? String(pernoites) : "-");
     atualizarTexto(resumoFaixa, faixa ? faixa.label : "Aguardando distância cadastrada");
     atualizarTexto(resumoQuantidadeDiarias, quantidadeDiarias !== null ? formatarQuantidadeDiarias(quantidadeDiarias) : "-");

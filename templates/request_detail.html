@@ -211,6 +211,10 @@
         </div>
     {% endif %}
 </section>
+
+<div class="actions">
+    <a class="button secondary" href="{{ url_for('requester_dashboard') if current_user['role'] == 'solicitante' else url_for('validator_dashboard') }}">Voltar</a>
+</div>
 {% endblock %}
 
 {% block scripts %}

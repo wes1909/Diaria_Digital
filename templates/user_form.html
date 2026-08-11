@@ -50,10 +50,10 @@
             </div>
         {% endif %}
         {% if can_edit_role or not is_edit %}
-            <label>
+            <label id="dailyGroupField" class="required">
                 Grupo de diária
-                <select name="daily_group">
-                    <option value="">Não se aplica</option>
+                <select id="dailyGroup" name="daily_group" required>
+                    <option value="" disabled {% if not user or not user["daily_group"] %}selected{% endif %}>Selecione um grupo</option>
                     {% for group, label in daily_groups.items() %}
                         <option value="{{ group }}" {% if user and user["daily_group"] == group %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
@@ -76,5 +76,6 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='cpf.js') }}"></script>
+<script src="{{ url_for('static', filename='grupo_funcional.js') }}"></script>
 <script src="{{ url_for('static', filename='campos_obrigatorios.js') }}"></script>
 {% endblock %}

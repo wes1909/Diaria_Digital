@@ -858,7 +858,7 @@ def duration_br(daily_request):
     if total_minutes < 0:
         return "-"
     hours, minutes = divmod(total_minutes, 60)
-    return f"{hours}h{minutes:02d}"
+    return f"{hours}h{minutes:02d}min"
 
 
 @app.template_filter("status_label")
