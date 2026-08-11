@@ -1,206 +1,328 @@
-# Documentacao do Sistema de Gestao de Diarias
+# Documentacao do Diaria Digital
 
-Este documento explica a organizacao do sistema e o significado dos principais nomes tecnicos usados no codigo. O objetivo e facilitar a apresentacao academica sem alterar nomes internos que seguem convencoes comuns de programacao.
+## 1. Visao geral
 
-## Objetivo do Sistema
+Diaria Digital e um sistema web academico para demonstrar a digitalizacao do fluxo de diarias na Administracao Publica Municipal. O sistema cobre solicitacao, analise, aprovacao, viagem, prestacao de contas e conclusao do processo.
 
-O sistema permite gerenciar solicitacoes de diarias em ambiente academico/local, com fluxo de cadastro da viagem, validacao, prestacao de contas e avaliacao final.
+A aplicacao e demonstrativa e local. Ela nao deve ser tratada como sistema oficial de producao institucional.
 
-## Perfis do Sistema
+## 2. Objetivo do sistema
 
-- **Servidor solicitante**: cadastra solicitacoes de diaria, corrige solicitacoes quando solicitado, envia prestacao de contas e acompanha o status.
-- **Servidor validador**: cadastra e edita servidores, analisa solicitacoes, aprova, rejeita, solicita correcoes e avalia prestacoes de contas.
+O objetivo e apresentar um fluxo digital compreensivel para gestao de diarias, com calculo automatico de valores, controle de status, anexos, validacao por servidor responsavel e prestacao de contas.
 
-## Autenticacao e Usuarios Demonstrativos
+## 3. Arquitetura e tecnologias
 
-O sistema utiliza CPF + senha para autenticar usuarios. O CPF e o identificador funcional de login e cadastro, enquanto a coluna antiga `email` pode permanecer no SQLite apenas como legado tecnico. Ela nao e usada no login, na pesquisa ou na interface.
+A aplicacao e desenvolvida com:
 
-O CPF e normalizado no backend por `normalize_cpf()`, ficando salvo apenas com digitos, por exemplo `11111111111`. A interface usa `static/cpf.js` para exibir e preencher a mascara `000.000.000-00` no login e no formulario de servidores.
+- Python;
+- Flask;
+- SQLite;
+- HTML e templates Jinja2;
+- CSS;
+- JavaScript;
+- Werkzeug para hash de senha;
+- Gunicorn como dependencia para execucao em hospedagem.
 
-Por se tratar de uma versao academica de demonstracao, os CPFs sao ficticios e a validacao confere somente presenca e 11 digitos apos a normalizacao. Nao e feita validacao matematica dos digitos verificadores oficiais.
+O arquivo principal e `app.py`. Os templates ficam em `templates/`, arquivos estaticos em `static/`, anexos em `uploads/` e o banco local em `diarias.db`.
 
-Usuarios demonstrativos recriados na base limpa:
+## 4. Perfis de usuario
 
-- Servidor Solicitante: CPF `111.111.111-11`, senha `123456`.
-- Servidor Validador: CPF `222.222.222-22`, senha `123456`.
+O sistema possui dois perfis:
 
-## Fluxo Principal
+- `solicitante`: servidor que cria solicitacoes, acompanha o andamento, corrige pedidos e envia prestacao de contas.
+- `validador`: servidor que cadastra usuarios, analisa solicitacoes, aprova, rejeita, solicita correcoes e avalia prestacoes de contas.
 
-1. O solicitante acessa o sistema.
-2. Cadastra uma solicitacao com destino, datas, horarios, quantidade de pernoites, objetivo e anexos opcionais.
-3. O sistema identifica a faixa da viagem automaticamente a partir do municipio escolhido e da distancia cadastrada.
-4. O backend calcula valor-base, quantidade total de diarias e valor total estimado antes de salvar.
-5. O validador analisa a solicitacao com acesso ao destino, distancia, horarios, duracao, faixa, quantidade de pernoites, quantidade de diarias, valor-base e valor total.
-6. O validador pode aprovar, rejeitar ou solicitar correcao.
-7. Apos aprovacao da viagem, o solicitante envia a prestacao de contas.
-8. O validador avalia a prestacao e pode aprovar, aprovar com ressalvas, rejeitar ou solicitar correcao.
+## 5. Autenticacao por CPF
 
-## Grupos Funcionais
+O login usa CPF + senha. O CPF e normalizado por `normalize_cpf()`, ficando salvo apenas com digitos. A interface usa `static/cpf.js` para aplicar a mascara `000.000.000-00` no login e no formulario de usuarios.
 
-- `agente_politico_comissionado`: Prefeito Municipal, Vice-Prefeito, Vereadores e Secretarios.
-- `servidor_geral`: demais servidores publicos efetivos, contratados, temporarios e ocupantes de cargos em comissao.
+A validacao de CPF em `validate_cpf()` confere presenca e 11 digitos apos normalizacao. A versao demonstrativa nao valida matematicamente os digitos verificadores. Os CPFs usados devem ser ficticios.
 
-O identificador antigo `agente_politico_comissionado` foi preservado para compatibilidade com usuarios e registros existentes, mas cargos comissionados devem ser cadastrados no grupo `servidor_geral`.
+A coluna antiga `email` permanece no SQLite como legado tecnico, pois a tabela original possuia restricao `NOT NULL UNIQUE`. Ela nao e usada para login, pesquisa ou exibicao funcional.
 
-## Valores das Diarias
+## 6. Banco de dados
 
-| Faixa automatica | Grupo Prefeito/Vice/Vereadores/Secretarios | Grupo demais servidores |
-|---|---:|---:|
-| Ate 200 km dentro de Santa Catarina | R$ 300,00 | R$ 300,00 |
-| Acima de 200 km dentro de Santa Catarina | R$ 600,00 | R$ 500,00 |
-| Fora de Santa Catarina ate 1.000 km ou Capital de SC | R$ 700,00 | R$ 800,00 |
-| Acima de 1.000 km ou Capital Federal | R$ 1.500,00 | R$ 1.300,00 |
+O banco usa SQLite e e inicializado/migrado por `init_db()` com `CREATE TABLE IF NOT EXISTS` e `ALTER TABLE` incremental.
 
-## Enquadramento Automatico
+### Tabela `users`
 
-O campo manual de enquadramento foi removido do formulario. O solicitante escolhe apenas estado e cidade. O sistema usa:
+Campos principais:
 
-- UF do destino.
-- Distancia rodoviaria aproximada em quilometros a partir de Lebon Regis/SC.
-- Identificacao de Florianopolis/SC como Capital do Estado.
-- Identificacao de Brasilia/DF como Capital Federal.
+- `id`: identificador interno.
+- `name`: nome do usuario.
+- `email`: campo legado tecnico.
+- `cpf`: CPF normalizado usado para login.
+- `password_hash`: hash da senha.
+- `role`: `solicitante` ou `validador`.
+- `daily_group`: grupo funcional usado no calculo da diaria.
+- `registration`: matricula.
+- `public_position`: cargo, emprego ou funcao.
 
-Regras:
+### Tabela `requests`
 
-- Destino em SC ate 200 km: `sc_ate_200`.
-- Destino em SC acima de 200 km: `sc_acima_200`.
-- Destino fora de SC ate 1.000 km ou Florianopolis/SC: `capital_sc_ou_fora_ate_1000`.
-- Destino acima de 1.000 km ou Brasilia/DF: `capital_federal_ou_acima_1000`.
+Campos principais:
 
-Se a distancia necessaria nao estiver cadastrada, o backend bloqueia o salvamento e informa que a distancia do municipio precisa ser preenchida.
+- `id`: identificador da solicitacao.
+- `user_id`: usuario solicitante.
+- `destination`: destino no formato `Cidade - UF`.
+- `departure_date` e `return_date`: datas da viagem.
+- `departure_time` e `return_time`: horarios previstos.
+- `objective`: objetivo da viagem.
+- `estimated_amount`: valor total calculado.
+- `status`: status interno do processo.
+- `validator_comment`: parecer do validador.
+- `accountability_text`: resumo da prestacao de contas.
+- `daily_group`: grupo funcional usado no calculo.
+- `daily_range`: faixa automatica da viagem.
+- `distance_km`: distancia considerada no momento do calculo.
+- `base_amount`: valor-base da diaria.
+- `overnight_count`: quantidade de pernoites informada e validada.
+- `daily_quantity`: quantidade total de diarias calculada.
+- `has_overnight`: campo legado/fallback.
+- `daily_factor`: campo legado/fallback do fator antigo.
+- `accountability_departure_time` e `accountability_arrival_time`: horarios informados na prestacao.
+- `transport_mode`: meio de transporte.
+- `departure_km` e `arrival_km`: quilometragem para veiculo oficial.
+- `refund_amount`: valor a devolver.
+- `created_at` e `updated_at`: datas de controle.
 
-## Duracao, Pernoites e Quantidade de Diarias
+### Tabela `attachments`
 
-A solicitacao possui `departure_time` e `return_time`. O backend combina data e hora de saida com data e hora de retorno e valida que o retorno seja posterior a saida.
+Campos principais:
 
-O campo visivel passou a ser "Quantidade de pernoites". O usuario informa um numero inteiro maior ou igual a zero. O backend valida essa quantidade por `validate_overnight_count()`, impedindo valores negativos, decimais, maiores que o maximo possivel entre as datas ou maiores que zero quando saida e retorno ocorrem no mesmo dia.
+- `id`: identificador do anexo.
+- `request_id`: solicitacao vinculada.
+- `filename`: nome salvo no servidor.
+- `original_name`: nome original do arquivo.
+- `kind`: `solicitacao` ou `prestacao`.
+- `attachment_type`: tipo auxiliar, como `deslocamento` ou `objetivo`.
+- `uploaded_at`: data de envio.
 
-A quantidade total de diarias e calculada por `calculate_daily_quantity()`. A versao demonstrativa utiliza uma regra operacional para decompor afastamentos superiores a 24 horas em blocos completos e periodo residual. Essa logica foi isolada para permitir adequacao futura caso exista regulamentacao administrativa especifica sobre a forma de calculo de multiplas diarias.
+## 7. Fluxo de solicitacao
 
-Regra operacional demonstrativa:
+O solicitante preenche estado, municipio, datas, horarios, quantidade de pernoites, objetivo e anexos opcionais. O backend recalcula o valor antes de salvar, usando grupo funcional, destino, distancia, faixa, duracao e pernoites.
 
-- Cada bloco completo de 24 horas corresponde a 1,00 diaria.
-- O residual superior a 12 horas recebe 1,00 diaria se houver pernoite associado ao residual.
-- O residual superior a 12 horas recebe 0,70 diaria se nao houver pernoite associado ao residual.
-- O residual inferior a 12 horas sem pernoite associado recebe 0,50 diaria.
-- Os blocos completos de 24 horas consomem, no maximo, um pernoite cada. Se a quantidade informada exceder os blocos completos, o residual e considerado com pernoite.
+Solicitacoes enviadas podem ser analisadas pelo validador, que aprova, rejeita ou solicita correcao. Quando ha correcao solicitada, o solicitante pode editar e reenviar.
 
-A decomposicao acima nao deve ser apresentada como texto literal da Lei Municipal n. 1.839/2026. Ela e uma regra operacional da versao academica.
+## 8. Indicador visual das etapas
 
-O caso exatamente igual a 12 horas permanece documentado como ambiguo no trecho legal usado. Para permitir o calculo na demonstracao, a constante `EXACT_12_HOURS_DAILY_FRACTION` define 0,70 diaria para residual exatamente igual a 12 horas sem pernoite associado.
+A tela de detalhes exibe uma linha visual com cinco macroetapas:
 
-O valor total passa a ser: `valor-base * daily_quantity`. O campo antigo `daily_factor` permanece como legado tecnico/fallback, mas novas solicitacoes usam `daily_quantity` e `overnight_count`.
-
-## Banco de Dados
-
-O `init_db()` continua usando migracoes incrementais com `ALTER TABLE`, preservando bancos SQLite existentes. Foram adicionadas colunas na tabela `requests`:
-
-| Coluna | Finalidade |
-|---|---|
-| `departure_time` | Hora de saida prevista |
-| `return_time` | Hora prevista de retorno |
-| `distance_km` | Copia historica da distancia usada no calculo |
-| `daily_factor` | Campo legado/fallback do fator antigo |
-| `base_amount` | Valor-base da diaria usado no calculo |
-| `overnight_count` | Quantidade de pernoites informada e validada |
-| `daily_quantity` | Quantidade total de diarias calculada |
-
-A copia da distancia na solicitacao preserva o historico caso a distancia cadastrada para um municipio seja alterada futuramente.
-
-## Municipios e Distancias
-
-A fonte de municipios permanece em `static/localidades.js`. A estrutura original de nomes por UF foi preservada e enriquecida em tempo de execucao para que cada municipio possua:
-
-- `nome`
-- `uf`
-- `cidade`
-- `uf`
-- `distancia_km`
-- `capitalEstadual`
-- `capitalFederal`
-
-As distancias ficam no mapa `distanciasLocalidadesKm` no mesmo arquivo. Para adicionar um novo municipio, inclua o nome na lista da UF correspondente e adicione sua distancia no mapa:
-
-```js
-const distanciasLocalidadesKm = {
-    "SC|Lebon Regis": 0,
-    "SC|Novo Municipio": 145
-};
+```text
+Solicitacao -> Analise -> Viagem -> Prestacao de contas -> Conclusao
 ```
 
-Nao foram inseridas distancias ficticias. Os municipios que nao possuem valor confiavel no projeto permanecem com `distancia_km: null` e precisam ser preenchidos posteriormente.
+A funcao `get_process_progress(status)` mapeia cada status interno para a macroetapa visual. O indicador e apenas uma camada de orientacao; os status internos continuam controlando as regras do processo.
 
-## Principais Arquivos
+Para `rejeitada`, como o status nao armazena com seguranca em qual macroetapa a rejeicao ocorreu, o sistema apresenta processo interrompido e nao marca a conclusao como concluida automaticamente.
 
-- `app.py`: rotas, regras de negocio, migracoes SQLite, validacoes e calculo definitivo no backend.
-- `templates/request_form.html`: formulario de solicitacao com destino, datas, horarios, quantidade de pernoites e resumo de calculo.
-- `templates/request_detail.html`: tela de detalhe, avaliacao e conferencia do calculo.
+## 9. Regras de localidades e distancia
+
+A lista de localidades fica em `static/localidades.js`, nas estruturas `localidadesNomesBrasil`, `distanciasLocalidadesKm` e `localidadesBrasil`.
+
+A versao demonstrativa usa uma lista reduzida:
+
+| UF | Municipio | Distancia aproximada |
+|---|---|---:|
+| SC | Lebon Regis | 0 km |
+| SC | Cacador | 50 km |
+| SC | Fraiburgo | 55 km |
+| SC | Curitibanos | 85 km |
+| SC | Campos Novos | 135 km |
+| SC | Lages | 165 km |
+| SC | Chapeco | 240 km |
+| SC | Joinville | 300 km |
+| SC | Blumenau | 300 km |
+| SC | Florianopolis | 320 km |
+| PR | Curitiba | 260 km |
+| RS | Porto Alegre | 500 km |
+| SP | Sao Paulo | 650 km |
+| DF | Brasilia | 1.500 km |
+| RJ | Rio de Janeiro | 1.102 km |
+
+O usuario nao escolhe a faixa manualmente. O backend usa `get_destination_distance()` e `determine_daily_range()` para obter a distancia e classificar a viagem.
+
+## 10. Grupos funcionais
+
+Os grupos em `DAILY_GROUPS` sao:
+
+- `agente_politico_comissionado`: Prefeito Municipal, Vice-Prefeito, Vereadores e Secretarios.
+- `servidor_geral`: demais servidores efetivos, contratados, temporarios e cargos em comissao.
+
+## 11. Valores-base
+
+Os valores em `DAILY_RATES` sao:
+
+| Faixa | Prefeito/Vice/Vereadores/Secretarios | Demais servidores |
+|---|---:|---:|
+| Ate 200 km dentro de SC | R$ 300,00 | R$ 300,00 |
+| Acima de 200 km dentro de SC | R$ 600,00 | R$ 500,00 |
+| Fora de SC ate 1.000 km ou Capital de SC | R$ 700,00 | R$ 800,00 |
+| Acima de 1.000 km ou Capital Federal | R$ 1.500,00 | R$ 1.300,00 |
+
+## 12. Calculo da duracao do afastamento
+
+O backend combina `departure_date + departure_time` e `return_date + return_time` em `build_travel_datetimes()`. A funcao `validate_travel_period()` valida que a saida nao seja anterior ao dia atual e que o retorno seja posterior a saida. A duracao e calculada em horas.
+
+## 13. Regra operacional para multiplos dias
+
+A legislacao usada como referencia no projeto nao detalha uma formula completa para decompor afastamentos de varios dias. Por isso, a versao demonstrativa usa uma regra operacional isolada em `calculate_daily_quantity()`.
+
+A regra divide o afastamento em blocos completos de 24 horas e eventual periodo residual. Ela foi documentada como decisao operacional da demonstracao, nao como transcricao literal da lei.
+
+## 14. Quantidade de pernoites
+
+O campo visivel e `Quantidade de pernoites`. A funcao `validate_overnight_count()` exige numero inteiro maior ou igual a zero, limita ao maximo possivel entre as datas e bloqueia pernoite maior que zero quando saida e retorno ocorrem no mesmo dia.
+
+O sistema nao presume que mudanca de data significa pernoite.
+
+## 15. Calculo da quantidade de diarias
+
+A funcao `calculate_daily_quantity(duration_hours, overnight_count)` aplica:
+
+- cada bloco completo de 24 horas = 1,00 diaria;
+- residual superior a 12 horas com pernoite associado = 1,00 diaria;
+- residual superior a 12 horas sem pernoite associado = 0,70 diaria;
+- residual inferior a 12 horas sem pernoite associado = 0,50 diaria.
+
+Blocos completos de 24 horas consomem no maximo um pernoite cada. Se os pernoites informados excedem os blocos completos, o residual e considerado com pernoite.
+
+O caso exatamente igual a 12 horas e tratado pela constante `EXACT_12_HOURS_DAILY_FRACTION = 0.70`, como decisao operacional demonstrativa.
+
+## 16. Calculo do valor total
+
+A funcao `calculate_daily_amount()` busca o valor-base conforme grupo funcional e faixa, e calcula:
+
+```text
+valor total = valor-base * daily_quantity
+```
+
+O valor enviado pelo navegador nao e confiado como valor definitivo. O Flask recalcula antes de salvar.
+
+## 17. Prestacao de contas
+
+A prestacao fica disponivel quando a viagem esta aprovada ou quando ha correcao de prestacao solicitada. O solicitante informa resumo, horarios, meio de transporte, valor a devolver e comprovantes.
+
+Quando ha valor a devolver menor que o valor recebido, o sistema exige comprovantes de deslocamento e comprovantes do cumprimento do objetivo. O validador pode aprovar, aprovar com ressalvas, rejeitar ou solicitar correcao.
+
+## 18. Regra das 48 horas
+
+`ACCOUNTABILITY_DEADLINE_DAYS = 2`. A funcao `get_overdue_accountability()` identifica solicitacoes aprovadas com retorno ha pelo menos dois dias e sem prestacao, ou com status `prestacao_correcao_solicitada`.
+
+Enquanto houver pendencia vencida, o painel do solicitante exibe o botao de nova solicitacao como bloqueado, mostra aviso da pendencia e link para abrir a solicitacao pendente. A rota `/solicitacoes/nova` tambem bloqueia a criacao e redireciona para a pendencia.
+
+## 19. Status internos
+
+Status em `STATUS_LABELS`:
+
+| Status | Significado |
+|---|---|
+| `rascunho` | Pedido ainda em preparacao. |
+| `enviada` | Solicitacao enviada para analise. |
+| `aprovada` | Viagem aprovada. |
+| `correcao_solicitada` | Correcao solicitada antes da aprovacao. |
+| `corrigida` | Solicitacao corrigida e reenviada. |
+| `prestacao_enviada` | Prestacao enviada para avaliacao. |
+| `prestacao_correcao_solicitada` | Correcao solicitada na prestacao. |
+| `prestacao_corrigida` | Prestacao corrigida e reenviada. |
+| `prestacao_aprovada` | Prestacao aprovada. |
+| `prestacao_aprovada_ressalvas` | Prestacao aprovada com ressalvas. |
+| `rejeitada` | Processo rejeitado. |
+
+## 20. Tooltips e apoio a usabilidade
+
+A interface possui tooltips em campos com regras menos obvias. O arquivo `static/tooltips.js` permite exibir as explicacoes por mouse, foco de teclado e toque/click. O CSS fica em `static/estilos.css`.
+
+## 21. Pagina inicial
+
+Usuarios nao autenticados acessam `templates/index.html`, uma pagina inicial com apresentacao do sistema, fluxo, perfis, aviso academico e botao para login. Usuarios autenticados sao redirecionados pela rota `/` ao painel correspondente.
+
+## 22. Usuarios demonstrativos
+
+Usuarios atualmente disponiveis no banco demonstrativo:
+
+- Solicitante com pendencia: CPF `111.111.111-11`, senha `123456`.
+- Validador: CPF `222.222.222-22`, senha `123456`.
+- Solicitante sem pendencia: CPF `333.333.333-33`, senha `123456`.
+
+As contas sao ficticias e existem apenas para demonstracao.
+
+## 23. Estrutura principal dos arquivos
+
+- `app.py`: rotas, regras de negocio, migracoes SQLite, validacoes e calculo definitivo.
+- `templates/index.html`: pagina inicial publica.
+- `templates/base.html`: estrutura comum das paginas.
+- `templates/login.html`: login por CPF.
+- `templates/request_form.html`: nova solicitacao/correcao de solicitacao.
+- `templates/request_detail.html`: detalhes, indicador visual, anexos e acoes.
 - `templates/requester_dashboard.html`: painel do solicitante.
 - `templates/validator_dashboard.html`: painel do validador.
-- `templates/form_prestacao.html`: formulario de prestacao de contas.
-- `templates/users_list.html`: listagem de servidores.
-- `templates/user_form.html`: cadastro e edicao de servidores.
-- `static/localidades.js`: estados, municipios e distancias cadastradas.
-- `static/calculo_diarias.js`: pre-visualizacao do calculo na interface.
-- `static/restricoes_datas.js`: regras visuais para datas da solicitacao.
-- `static/prestacao.js`: mascaras e regras visuais da prestacao de contas.
-- `static/campos_obrigatorios.js`: validacao visual de campos obrigatorios.
-- `static/tooltips.js`: comportamento dos icones de informacao acessiveis por foco, mouse e toque.
-- `static/cpf.js`: mascara visual de CPF no login e no cadastro de servidores.
+- `templates/form_prestacao.html`: prestacao de contas.
+- `templates/users_list.html`: listagem de usuarios.
+- `templates/user_form.html`: cadastro/edicao de usuarios.
 - `static/estilos.css`: estilos e responsividade.
+- `static/localidades.js`: destinos e distancias.
+- `static/calculo_diarias.js`: previa visual do calculo.
+- `static/prestacao.js`: comportamento do formulario de prestacao.
+- `static/restricoes_datas.js`: apoio visual para datas.
+- `static/horarios_24h.js`: mascara/validacao visual de horarios.
+- `static/cpf.js`: mascara de CPF.
+- `static/tooltips.js`: tooltips.
+- `static/acessibilidade.js`: alto contraste.
+- `static/campos_obrigatorios.js`: apoio visual de campos obrigatorios.
 
-## Glossario de Nomes Tecnicos
+## 24. Principais funcoes do backend
 
-| Nome no codigo | Significado |
-|---|---|
-| `user` | Usuario ou servidor cadastrado |
-| `request` | Solicitacao de diaria |
-| `daily_request` | Solicitacao carregada para exibicao ou edicao |
-| `accountability` | Prestacao de contas |
-| `validator` | Servidor validador |
-| `requester` | Servidor solicitante |
-| `destination` | Destino da viagem |
-| `departure_date` | Data de saida |
-| `departure_time` | Hora de saida |
-| `return_date` | Data de retorno |
-| `return_time` | Hora prevista de retorno |
-| `distance_km` | Distancia usada no calculo |
-| `daily_group` | Grupo funcional do servidor |
-| `daily_range` | Faixa automatica da viagem |
-| `daily_factor` | Campo legado/fallback do fator antigo |
-| `overnight_count` | Quantidade de pernoites |
-| `daily_quantity` | Quantidade total de diarias |
-| `base_amount` | Valor-base da faixa |
-| `estimated_amount` | Valor total calculado |
-| `has_overnight` | Campo legado; novas solicitacoes usam `overnight_count` |
-| `validator_comment` | Parecer do validador |
-| `accountability_text` | Resumo da prestacao de contas |
-| `transport_mode` | Meio de transporte utilizado |
-| `departure_km` | Quilometragem de saida na prestacao |
-| `arrival_km` | Quilometragem de chegada na prestacao |
-| `refund_amount` | Valor a devolver |
-| `attachments` | Anexos ou comprovantes |
-| `registration` | Matricula do servidor |
-| `public_position` | Cargo, emprego ou funcao |
-| `cpf` | CPF normalizado do usuario, usado para login |
+- `normalize_cpf()`, `validate_cpf()`, `format_cpf()`: tratamento de CPF.
+- `current_user()`, `login_required()`, `role_required()`: sessao e permissao.
+- `load_locality_distances()`, `get_destination_distance()`, `determine_daily_range()`: destinos, distancias e faixas.
+- `parse_form_date()`, `parse_form_time()`, `build_travel_datetimes()`, `validate_travel_period()`: datas, horarios e duracao.
+- `calculate_max_overnights()`, `validate_overnight_count()`: pernoites.
+- `calculate_daily_quantity()`, `calculate_residual_daily_fraction()`: quantidade de diarias.
+- `calculate_daily_amount()`, `calculate_request_amount()`: valor-base e valor total.
+- `get_overdue_accountability()`: pendencia de prestacao apos 48 horas.
+- `get_process_progress()`: mapeamento visual de status para macroetapas.
+- `validate_accountability_form()`, `validate_accountability_files()`: prestacao de contas.
+- `save_attachment()`, `get_attachments()`: anexos.
 
-## Status Utilizados
+## 25. Principais arquivos JavaScript
 
-| Status interno | Texto exibido |
-|---|---|
-| `enviada` | Enviada |
-| `aprovada` | Viagem Aprovada |
-| `correcao_solicitada` | Correcao Solicitada |
-| `corrigida` | Corrigida |
-| `prestacao_enviada` | Prestacao Enviada |
-| `prestacao_correcao_solicitada` | Correcao da Prestacao Solicitada |
-| `prestacao_corrigida` | Prestacao Corrigida |
-| `prestacao_aprovada` | Prestacao Aprovada |
-| `prestacao_aprovada_ressalvas` | Prestacao Aprovada com Ressalvas |
-| `rejeitada` | Rejeitada |
+- `localidades.js`: popula estado/cidade, monta destino e exibe distancia aproximada.
+- `calculo_diarias.js`: previa do valor-base, duracao, pernoites, quantidade de diarias e valor total.
+- `acessibilidade.js`: alternancia de alto contraste.
+- `cpf.js`: mascara de CPF.
+- `tooltips.js`: abertura/fechamento de tooltips.
+- `restricoes_datas.js`: apoio aos campos de data.
+- `horarios_24h.js`: entrada de horas no formato 24h.
+- `prestacao.js`: comportamento dos campos da prestacao de contas.
+- `campos_obrigatorios.js`: realce visual de obrigatoriedade.
 
-## Observacao Sobre Variaveis em Ingles
+## 26. Seguranca e limitacoes
 
-Alguns nomes internos foram mantidos em ingles por seguirem padroes comuns de desenvolvimento web, especialmente em Flask, HTML, JavaScript e bancos de dados. A interface, mensagens, regras e documentacao estao em portugues, priorizando a compreensao pelo usuario final e pela banca avaliadora.
+A aplicacao e academica. Para producao seriam necessarios reforcos de seguranca, auditoria, controle de acesso a arquivos, protecao de dados pessoais, validacoes oficiais, politica de backups, armazenamento apropriado de anexos e integracao com sistemas institucionais.
 
-O sistema encontra-se hospedado em ambiente gratuito de nuvem, sujeito a inicializacao sob demanda.
+Nao utilize CPF real, dados bancarios reais ou documentos pessoais reais no ambiente demonstrativo.
+
+## 27. Execucao local
+
+Instale dependencias:
+
+```bash
+pip install -r requirements.txt
+```
+
+Execute:
+
+```bash
+python app.py
+```
+
+Acesse `http://127.0.0.1:5000`.
+
+## 28. Deploy no Render
+
+O projeto possui `gunicorn` em `requirements.txt`, o que permite execucao em hospedagem como Render quando configurada externamente. O repositorio atual nao possui arquivo `render.yaml`, `Procfile`, credenciais ou tokens de deploy.
+
+## 29. Observacoes para demonstracao academica
+
+Use apenas dados ficticios. O objetivo e demonstrar fluxo, usabilidade, calculo automatico, controle de status e prestacao de contas. Decisoes operacionais demonstrativas, como a decomposicao de multiplas diarias, foram isoladas para ajuste futuro caso exista regulamentacao administrativa especifica.

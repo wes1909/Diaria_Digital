@@ -405,12 +405,35 @@ button:hover,
 }
 
 .demo-users {
-    border-top: 1px solid var(--line);
-    color: var(--muted);
     display: grid;
-    gap: 6px;
-    margin-top: 22px;
-    padding-top: 18px;
+    gap: 10px;
+    margin-top: 24px;
+}
+
+.demo-user {
+    background: #f7f8fa;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 10px 12px;
+}
+
+.demo-user > strong {
+    color: var(--primary);
+    font-size: 0.9rem;
+}
+
+.demo-user > span {
+    color: #666;
+    font-size: 0.8rem;
+}
+
+.demo-user > small {
+    color: #444;
+    font-size: 0.78rem;
+    margin-top: 3px;
 }
 
 .page-heading {
@@ -1161,5 +1184,173 @@ tr:last-child td {
     .info-tooltip:focus .tooltip-text,
     .info-tooltip.is-open .tooltip-text {
         transform: translateY(0);
+    }
+}
+
+
+/* Progresso macro do processo */
+.process-progress {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    display: grid;
+    gap: 18px;
+    margin-bottom: 22px;
+    padding: 20px;
+}
+
+.process-progress-heading {
+    align-items: start;
+    display: flex;
+    gap: 16px;
+    justify-content: space-between;
+}
+
+.process-progress-heading div {
+    display: grid;
+    gap: 6px;
+}
+
+.process-progress-heading strong,
+.process-state {
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.process-progress-heading span:not(.badge) {
+    color: var(--primary-dark);
+    font-weight: 800;
+}
+
+.process-steps {
+    counter-reset: process-step;
+    display: grid;
+    gap: 12px;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.process-step {
+    align-content: start;
+    border-top: 3px solid var(--line);
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    padding-top: 12px;
+}
+
+.process-marker {
+    align-items: center;
+    background: #f8fafc;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--muted);
+    display: inline-flex;
+    font-size: 13px;
+    font-weight: 800;
+    height: 28px;
+    justify-content: center;
+    width: 28px;
+}
+
+.process-label {
+    color: var(--text);
+    font-weight: 800;
+    line-height: 1.25;
+}
+
+.process-step.is-concluida {
+    border-color: var(--success);
+}
+
+.process-step.is-concluida .process-marker {
+    background: #eaf7f0;
+    border-color: #8fd2ad;
+    color: var(--success);
+}
+
+.process-step.is-atual {
+    border-color: var(--primary);
+}
+
+.process-step.is-atual .process-marker {
+    background: #eef6fc;
+    border-color: var(--primary);
+    color: var(--primary-dark);
+}
+
+.process-step.is-atual .process-label {
+    color: var(--primary-dark);
+}
+
+.process-step.is-futura {
+    opacity: 0.68;
+}
+
+.process-step.is-interrompida {
+    border-color: var(--danger);
+}
+
+.process-step.is-interrompida .process-marker {
+    background: #fee4e2;
+    border-color: #f7b7b2;
+    color: var(--danger);
+}
+
+.process-progress.is-rejected {
+    border-color: #f7b7b2;
+}
+
+.process-note {
+    background: #fff5f3;
+    border: 1px solid #f7b7b2;
+    border-radius: 6px;
+    color: var(--danger);
+    font-size: 14px;
+    font-weight: 700;
+    margin: 0;
+    padding: 10px 12px;
+}
+
+.high-contrast .process-progress,
+.high-contrast .process-marker,
+.high-contrast .process-note {
+    background: #000000;
+    border-color: #ffffff;
+    color: #ffffff;
+}
+
+.high-contrast .process-step {
+    border-color: #ffffff;
+}
+
+.high-contrast .process-step.is-atual,
+.high-contrast .process-step.is-concluida {
+    border-color: var(--primary);
+}
+
+@media (max-width: 760px) {
+    .process-progress-heading {
+        display: grid;
+    }
+
+    .process-steps {
+        grid-template-columns: 1fr;
+    }
+
+    .process-step {
+        align-items: center;
+        border-left: 3px solid var(--line);
+        border-top: 0;
+        grid-template-columns: auto minmax(0, 1fr);
+        padding-left: 12px;
+        padding-top: 0;
+    }
+
+    .process-state {
+        grid-column: 2;
     }
 }

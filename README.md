@@ -1,91 +1,70 @@
-# Sistema Web de Gestao de Diarias
+# Diaria Digital
 
-Projeto academico simples para demonstrar o fluxo de gestao de diarias com dois perfis:
+Diaria Digital e um sistema web academico desenvolvido para demonstrar a digitalizacao do processo de solicitacao, analise, aprovacao, viagem e prestacao de contas de diarias na Administracao Publica Municipal.
 
-- Servidor solicitante: cadastra solicitacao, informa destino, datas, horarios, quantidade de pernoites, objetivo, anexos e envia prestacao de contas.
-- Servidor validador: cadastra usuarios, visualiza solicitacoes, confere o calculo automatico, aprova ou solicita correcao.
-- Calculo automatico da diaria por grupo funcional, municipio de destino, distancia cadastrada, faixa legal, duracao total prevista e quantidade de pernoites.
+O projeto e um ambiente demonstrativo. Ele nao representa um sistema oficialmente implantado em producao institucional, e os dados usados devem ser ficticios.
 
+## Tecnologias
 
-## Pagina inicial publica
+- Python
+- Flask
+- SQLite
+- HTML
+- CSS
+- JavaScript
+- Gunicorn
 
-Ao acessar `/` sem estar autenticado, o sistema exibe uma pagina inicial de apresentacao do Diaria Digital, com resumo do objetivo academico, fluxo principal, perfis de acesso e aviso de ambiente demonstrativo.
+O projeto possui `requirements.txt` com as dependencias Python. Nao ha arquivo de configuracao de deploy com credenciais no repositorio.
 
-O botao `Acessar o sistema` direciona para `/login`. Usuarios autenticados continuam sendo redirecionados automaticamente pela rota `/` para o painel correspondente ao perfil: solicitante ou validador.
+## Perfis de acesso
 
-## Autenticacao por CPF
+- **Servidor Solicitante**: cria solicitacoes de diaria, acompanha o andamento, corrige solicitacoes quando necessario e envia a prestacao de contas.
+- **Servidor Validador**: cadastra usuarios, analisa solicitacoes, aprova, rejeita, solicita correcoes e avalia prestacoes de contas.
 
-A versao demonstrativa usa CPF + senha para acesso. O CPF e armazenado internamente somente com numeros, sem pontos ou hifen, e a interface aplica mascara visual no formato `000.000.000-00`.
+## Usuarios demonstrativos
 
-O backend sempre normaliza o CPF recebido antes de consultar ou salvar. A validacao desta versao academica confere presenca e quantidade de 11 digitos apos a normalizacao. Nao ha validacao matematica dos digitos verificadores oficiais do CPF, pois os dados de demonstracao sao ficticios.
+- **Solicitante com pendencia**: CPF `111.111.111-11`, senha `123456`.
+  Demonstra o bloqueio por prestacao de contas vencida.
+- **Validador**: CPF `222.222.222-22`, senha `123456`.
+  Demonstra o painel de analise, validacao e cadastro de usuarios.
+- **Solicitante sem pendencia**: CPF `333.333.333-33`, senha `123456`.
+  Demonstra o fluxo normal de uma nova solicitacao.
 
-A coluna antiga `email` pode permanecer no SQLite apenas como legado tecnico da estrutura original. Ela nao e usada para login, cadastro, pesquisa ou exibicao na interface. Novos usuarios recebem um valor tecnico interno nessa coluna apenas para compatibilidade com a restricao antiga do banco.
+## Autenticacao
 
-A mascara visual fica em `static/cpf.js` e e usada no login e no formulario de cadastro/edicao de servidores.
+O acesso ao sistema e feito por CPF + senha. O CPF e usado como identificador de acesso, armazenado internamente apenas com numeros, e exibido na interface com mascara `000.000.000-00`.
 
-## Regras atuais de calculo
+Os CPFs demonstrativos sao ficticios. Nao utilize CPF real, dados bancarios reais ou documentos pessoais reais neste ambiente.
 
-Grupos funcionais:
+## Fluxo principal
 
-- `agente_politico_comissionado`: Prefeito Municipal, Vice-Prefeito, Vereadores e Secretarios.
-- `servidor_geral`: demais servidores publicos efetivos, contratados, temporarios e ocupantes de cargos em comissao.
-
-Valores-base:
-
-| Faixa | Prefeito/Vice/Vereadores/Secretarios | Demais servidores |
-|---|---:|---:|
-| Ate 200 km dentro de SC | R$ 300,00 | R$ 300,00 |
-| Acima de 200 km dentro de SC | R$ 600,00 | R$ 500,00 |
-| Fora de SC ate 1.000 km ou Capital de SC | R$ 700,00 | R$ 800,00 |
-| Acima de 1.000 km ou Capital Federal | R$ 1.500,00 | R$ 1.300,00 |
-
-Quantidade de diarias por duracao e pernoites:
-
-O formulario utiliza o campo `Quantidade de pernoites`, com valor inteiro maior ou igual a zero. O backend valida esse numero, limita ao maximo possivel entre a data de saida e a data de retorno e impede pernoite em viagens com saida e retorno no mesmo dia.
-
-A quantidade total de diarias fica em `daily_quantity` e e calculada pela funcao `calculate_daily_quantity()`:
-
-- Cada bloco completo de 24 horas corresponde a 1,00 diaria.
-- O periodo residual e calculado pela regra operacional demonstrativa.
-- Residual superior a 12 horas com pernoite associado: 1,00 diaria.
-- Residual superior a 12 horas sem pernoite associado: 0,70 diaria.
-- Residual inferior a 12 horas sem pernoite associado: 0,50 diaria.
-- Blocos completos de 24 horas consomem, no maximo, um pernoite cada. Se os pernoites informados excederem os blocos completos, o residual e considerado com pernoite.
-
-Exemplos:
-
-| Duracao total | Pernoites | Quantidade calculada |
-|---:|---:|---:|
-| 10 horas | 0 | 0,50 diaria |
-| 14 horas | 0 | 0,70 diaria |
-| 14 horas | 1 | 1,00 diaria |
-| 30 horas | 1 | 1,50 diaria |
-| 48 horas | 2 | 2,00 diarias |
-| 62 horas | 2 | 2,70 diarias |
-| 62 horas | 3 | 3,00 diarias |
-
-A versao demonstrativa utiliza uma regra operacional para decompor afastamentos superiores a 24 horas em blocos completos e periodo residual. Essa logica foi isolada para permitir adequacao futura caso exista regulamentacao administrativa especifica sobre a forma de calculo de multiplas diarias. Essa decomposicao nao deve ser apresentada como texto literal da Lei Municipal n. 1.839/2026.
-
-Para periodo exatamente igual a 12 horas, o sistema adota a decisao operacional demonstrativa de aplicar 0,70 diaria quando nao houver pernoite associado ao periodo residual. O valor definitivo e sempre recalculado no backend Flask antes de salvar.
-
-O valor total estimado e calculado como:
+O sistema apresenta uma linha visual de progresso com cinco macroetapas:
 
 ```text
-valor total = valor-base da diaria * daily_quantity
+Solicitacao -> Analise -> Viagem -> Prestacao de contas -> Conclusao
 ```
 
-No calculo atual, novas solicitacoes gravam:
+Essa linha e apenas uma representacao visual simplificada. Os status internos continuam sendo mais detalhados e controlam as permissoes, transicoes, correcoes, aprovacoes e rejeicoes.
 
-- `overnight_count`: quantidade de pernoites informada e validada.
-- `daily_quantity`: quantidade total de diarias calculada.
+## Solicitacao de diaria
 
-Os campos antigos `has_overnight` e `daily_factor` podem permanecer no banco como legado/fallback para registros anteriores.
+O solicitante informa:
 
-## Municipios e distancias
+- estado;
+- municipio;
+- data e hora de saida;
+- data e hora prevista de retorno;
+- quantidade de pernoites;
+- objetivo da viagem;
+- anexos da solicitacao, quando aplicavel.
 
-A lista de destinos fica em `static/localidades.js`, na estrutura `localidadesNomesBrasil`. Para o modo de demonstracao academica, a base foi reduzida para 15 destinos:
+O grupo funcional do servidor e obtido do cadastro do usuario.
 
-| UF | Municipio | Distancia rodoviaria aproximada |
+## Localidades e distancia
+
+A versao demonstrativa usa uma lista reduzida de destinos em `static/localidades.js`. A distancia rodoviaria aproximada entre Lebon Regis/SC e cada destino e cadastrada internamente. O usuario nao escolhe manualmente a faixa de distancia; o sistema identifica a faixa automaticamente.
+
+| UF | Municipio | Distancia aproximada |
 |---|---|---:|
 | SC | Lebon Regis | 0 km |
 | SC | Cacador | 50 km |
@@ -103,67 +82,81 @@ A lista de destinos fica em `static/localidades.js`, na estrutura `localidadesNo
 | DF | Brasilia | 1.500 km |
 | RJ | Rio de Janeiro | 1.102 km |
 
-As distancias ficam no objeto `distanciasLocalidadesKm`, usando chaves no formato `UF|Municipio`. Os valores sao numericos e representam quilometros inteiros aproximados, sem a unidade `km` no codigo.
+## Valores-base das diarias
 
-Exemplo:
+| Faixa | Prefeito/Vice/Vereadores/Secretarios | Demais servidores |
+|---|---:|---:|
+| Ate 200 km dentro de SC | R$ 300,00 | R$ 300,00 |
+| Acima de 200 km dentro de SC | R$ 600,00 | R$ 500,00 |
+| Fora de SC ate 1.000 km ou Capital de SC | R$ 700,00 | R$ 800,00 |
+| Acima de 1.000 km ou Capital Federal | R$ 1.500,00 | R$ 1.300,00 |
 
-```js
-const distanciasLocalidadesKm = {
-    "SC|Lebon Regis": 0,
-    "SC|Cacador": 50
-};
+## Calculo do periodo e das diarias
+
+O sistema calcula a duracao total do afastamento combinando data/hora de saida ate data/hora de retorno.
+
+Para a versao demonstrativa, afastamentos superiores a 24 horas sao tratados por uma regra operacional isolada no backend. Essa regra decompoe o periodo em blocos completos de 24 horas e eventual periodo residual. Ela nao deve ser apresentada como texto literal da legislacao.
+
+- Cada bloco completo de 24 horas corresponde a 1,00 diaria.
+- O periodo residual e analisado conforme duracao e pernoites informados.
+- A quantidade total de diarias e multiplicada pelo valor-base.
+- O campo antigo "Havera pernoite?" foi substituido por "Quantidade de pernoites".
+- O sistema nao presume automaticamente que a mudanca de data significa pernoite.
+
+Formula simplificada:
+
+```text
+distancia + grupo funcional -> valor-base
+duracao + quantidade de pernoites -> quantidade de diarias
+valor-base * quantidade de diarias -> valor total estimado
 ```
 
-As distancias devem ser rodoviarias, considerando deslocamento por vias terrestres entre Lebon Regis/SC e a sede do municipio de destino. Nao use distancia em linha reta, formula de Haversine ou estimativas baseadas apenas em latitude e longitude.
+## Prestacao de contas
 
-Rio de Janeiro/RJ foi cadastrado com 1.102 km para demonstrar destino comum acima de 1.000 km, com base em distancia rodoviaria aproximada consultada em RotaMapas e conferida com valor semelhante no Rome2Rio.
+Apos a aprovacao da viagem, o solicitante pode enviar a prestacao de contas com resumo da viagem, horarios, meio de transporte, valor a devolver quando aplicavel e comprovantes de deslocamento e de cumprimento do objetivo.
 
-## Banco de dados demonstrativo
+O validador pode aprovar, aprovar com ressalvas, rejeitar ou solicitar correcao da prestacao, conforme o status atual do processo.
 
-O banco SQLite `diarias.db` mantem a estrutura das tabelas principais do sistema:
+## Regra das 48 horas
 
-- `users`
-- `requests`
-- `attachments`
+O sistema identifica prestacao de contas pendente apos o prazo configurado de 48 horas do retorno. Enquanto houver pendencia vencida, o solicitante nao pode criar nova solicitacao. O painel mantem o botao de nova solicitacao visivel, mas bloqueado, exibe o motivo da restricao e oferece link para abrir a solicitacao pendente.
 
-Para a demonstracao atual, os registros antigos de teste foram removidos e a base foi reiniciada com apenas os dois usuarios demonstrativos padrao. As tabelas e colunas usadas pelo fluxo de solicitacao, aprovacao, anexos e prestacao de contas foram preservadas.
+## Indicador visual do processo
 
-A tabela `users` possui a coluna `cpf`, usada como identificador funcional de login. O sistema tambem cria um indice unico para CPF quando possivel, evitando duplicidade de usuarios com o mesmo documento.
+A tela de detalhes da solicitacao possui uma linha de progresso com as macroetapas do processo. Correcoes e rejeicoes continuam sendo controladas pelos status internos detalhados. Quando o status e `rejeitada`, o processo aparece como interrompido, sem marcar indevidamente a conclusao como finalizada.
 
-## Tecnologias
+## Tooltips
 
-- Python
-- Flask
-- SQLite
+A interface usa icones de informacao com tooltips em campos que possuem regras ou conceitos menos obvios, como distancia, quantidade de pernoites, quantidade de diarias, valor-base e comprovantes.
 
-## Como executar
+## Pagina inicial
 
-1. Crie e ative um ambiente virtual, se desejar.
-2. Instale as dependencias:
+Visitantes nao autenticados acessam uma pagina inicial de apresentacao com objetivo do sistema, fluxo, perfis, aviso de ambiente demonstrativo e acesso ao login.
+
+## Execucao local
+
+1. Instale as dependencias:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Execute o sistema:
+2. Execute a aplicacao:
 
 ```bash
 python app.py
 ```
 
-4. Acesse `http://127.0.0.1:5000`.
+3. Acesse:
 
-## Usuarios de demonstracao
+```text
+http://127.0.0.1:5000
+```
 
-- Servidor Solicitante: CPF `111.111.111-11`, senha `123456`
-- Servidor Validador: CPF `222.222.222-22`, senha `123456`
+## Deploy
 
-O CPF tambem pode ser digitado sem pontuacao, por exemplo `11111111111`.
+A aplicacao possui dependencia `gunicorn`, utilizada em ambientes de hospedagem como Render. Nao ha credenciais, tokens ou configuracoes sensiveis documentadas no repositorio.
 
-## Observacoes de escopo
+## Limitacoes
 
-Este projeto e intencionalmente academico e local. Para uso real, seria necessario reforcar seguranca, auditoria, controle de permissoes em anexos, regras formais de valores e integracao com sistemas institucionais.
-
-## Documentacao complementar
-
-Consulte `DOCUMENTACAO.md` para uma explicacao sobre fluxos, regras de negocio, banco de dados e principais nomes tecnicos usados no codigo.
+Para uso real, ainda seriam necessarios aprimoramentos de seguranca, auditoria, protecao de dados pessoais, armazenamento adequado de arquivos, integracao com sistemas institucionais, validacoes normativas completas e infraestrutura de producao.

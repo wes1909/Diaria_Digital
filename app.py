@@ -85,6 +85,47 @@ STATUS_LABELS = {
 REQUEST_REVIEW_STATUSES = {"enviada", "corrigida", "correcao_solicitada", "aprovada"}
 ACCOUNTABILITY_REVIEW_STATUSES = {"prestacao_enviada", "prestacao_corrigida"}
 
+PROCESS_STAGES = [
+    {
+        "key": "solicitacao",
+        "label": "Solicita\u00e7\u00e3o",
+        "description": "Dados da viagem sao preenchidos e encaminhados para analise.",
+    },
+    {
+        "key": "analise",
+        "label": "An\u00e1lise",
+        "description": "A solicitacao e conferida pelo servidor responsavel pela validacao.",
+    },
+    {
+        "key": "viagem",
+        "label": "Viagem",
+        "description": "A solicitacao foi aprovada e o afastamento esta autorizado.",
+    },
+    {
+        "key": "prestacao",
+        "label": "Presta\u00e7\u00e3o de contas",
+        "description": "O servidor apresenta as informacoes e os comprovantes referentes a viagem realizada.",
+    },
+    {
+        "key": "conclusao",
+        "label": "Conclus\u00e3o",
+        "description": "A prestacao de contas foi analisada e o processo foi finalizado.",
+    },
+]
+
+PROCESS_STAGE_BY_STATUS = {
+    "rascunho": 0,
+    "correcao_solicitada": 0,
+    "enviada": 1,
+    "corrigida": 1,
+    "aprovada": 2,
+    "prestacao_enviada": 3,
+    "prestacao_corrigida": 3,
+    "prestacao_correcao_solicitada": 3,
+    "prestacao_aprovada": 4,
+    "prestacao_aprovada_ressalvas": 4,
+}
+
 ROLE_LABELS = {
     "solicitante": "Servidor solicitante",
     "validador": "Servidor validador",
@@ -660,6 +701,40 @@ def role_required(role):
     return decorator
 
 
+def get_process_progress(status):
+    is_rejected = status == "rejeitada"
+    current_index = PROCESS_STAGE_BY_STATUS.get(status, 0)
+    is_complete = status in {"prestacao_aprovada", "prestacao_aprovada_ressalvas"}
+
+    stages = []
+    for index, stage in enumerate(PROCESS_STAGES):
+        if is_rejected:
+            state = "interrompida" if index == current_index else ("concluida" if index < current_index else "futura")
+        elif is_complete:
+            state = "concluida"
+        elif index < current_index:
+            state = "concluida"
+        elif index == current_index:
+            state = "atual"
+        else:
+            state = "futura"
+
+        stages.append({
+            **stage,
+            "state": state,
+            "index": index,
+        })
+
+    current_stage = PROCESS_STAGES[current_index]
+    return {
+        "stages": stages,
+        "current_stage": current_stage,
+        "current_index": current_index,
+        "is_rejected": is_rejected,
+        "is_complete": is_complete,
+    }
+
+
 def get_user_or_404(user_id):
     with get_db() as db:
         user = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
@@ -1194,7 +1269,12 @@ def request_detail(request_id):
 
     attachments = get_attachments(request_id)
 
-    return render_template("request_detail.html", daily_request=daily_request, attachments=attachments)
+    return render_template(
+        "request_detail.html",
+        daily_request=daily_request,
+        attachments=attachments,
+        process_progress=get_process_progress(daily_request["status"]),
+    )
 
 
 @app.route("/solicitacoes/<int:request_id>/prestacao", methods=["GET", "POST"])
