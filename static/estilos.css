@@ -1905,3 +1905,16 @@ tbody tr:hover {
 .high-contrast .date-display:focus-visible {
     box-shadow: 0 0 0 4px rgba(0, 255, 255, 0.35);
 }
+
+.demo-reset-form {
+    display: inline;
+    margin: 0;
+}
+
+.demo-reset-button {
+    background: transparent;
+    border: 1px solid currentColor;
+    color: inherit;
+    font-size: 0.85rem;
+    padding: 7px 10px;
+}

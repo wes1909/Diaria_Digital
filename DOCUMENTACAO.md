@@ -23,7 +23,7 @@ A aplicacao e desenvolvida com:
 - Werkzeug para hash de senha;
 - Gunicorn como dependencia para execucao em hospedagem.
 
-O arquivo principal e `app.py`. Os templates ficam em `templates/`, arquivos estaticos em `static/`, anexos em `uploads/` e o banco local em `diarias.db`.
+O arquivo principal e `app.py`. Os templates ficam em `templates/`, os arquivos estaticos em `static/` e `diarias.db` funciona como modelo inicial. Bancos de trabalho e anexos ficam em diretorios temporarios isolados por sessao.
 
 ## 4. Perfis de usuario
 
@@ -42,7 +42,7 @@ A coluna antiga `email` permanece no SQLite como legado tecnico, pois a tabela o
 
 ## 6. Banco de dados
 
-O banco usa SQLite e e inicializado/migrado por `init_db()` com `CREATE TABLE IF NOT EXISTS` e `ALTER TABLE` incremental.
+O banco usa SQLite. Cada copia temporaria e inicializada/migrada por `init_db(database_path)` com `CREATE TABLE IF NOT EXISTS` e `ALTER TABLE` incremental; o banco-modelo nao e migrado durante requisicoes normais.
 
 ### Tabela `users`
 
@@ -326,3 +326,18 @@ O projeto possui `gunicorn` em `requirements.txt`, o que permite execucao em hos
 ## 29. Observacoes para demonstracao academica
 
 Use apenas dados ficticios. O objetivo e demonstrar fluxo, usabilidade, calculo automatico, controle de status e prestacao de contas. Decisoes operacionais demonstrativas, como a decomposicao de multiplas diarias, foram isoladas para ajuste futuro caso exista regulamentacao administrativa especifica.
+# Arquitetura da demonstração isolada por sessão
+
+Na versão destinada à avaliação acadêmica, `diarias.db` é exclusivamente o banco-modelo. A aplicação nunca o abre implicitamente em uma rota normal: `get_db()` resolve a cópia associada a `session["demo_environment_id"]`, enquanto `init_db(database_path)` recebe sempre o caminho explícito que será preparado.
+
+No primeiro acesso de uma sessão, `get_demo_environment_id()` cria um UUID hexadecimal de 32 caracteres exclusivamente no servidor. O valor é validado antes de selecionar qualquer diretório e o cookie Flask guarda apenas esse identificador e, durante a autenticação, o `user_id`. CPF, IP, nome e user-agent não participam do caminho. A sessão é permanente por 7 dias; fechar e reabrir normalmente o mesmo navegador recupera o ambiente enquanto o cookie e os arquivos temporários existirem.
+
+`create_demo_environment()` copia o modelo com `shutil.copy2()` para `<temp>/diaria_digital_demo/<id>/diarias.db`, atualiza o schema dessa cópia e prepara os cenários. O registro aprovado e sem prestação mais recente do CPF 111 é reutilizado deterministicamente; suas datas passam a ser saída quatro dias antes e retorno três dias antes da data corrente. Se ele não existir, um registro demonstrativo é criado. Para o CPF 333, qualquer registro que já começaria vencido tem o retorno trazido para a data atual, preservando-o livre para uma nova solicitação.
+
+Os três CPFs demonstrativos são conferidos sem duplicação e recebem a senha `123456`. O login cria o ambiente antes de consultar o usuário. Login e logout preservam `demo_environment_id`, o que permite criar como solicitante, sair, entrar como validador e continuar no mesmo banco isolado.
+
+`get_demo_upload_folder()` direciona gravação e download para `<temp>/diaria_digital_demo/<id>/uploads/`. A pasta-base atual não contém arquivos nem registros de anexos. Mesmo assim, a preparação copia somente nomes seguros que estejam referenciados pela tabela `attachments`, caso o modelo passe a incluí-los no futuro.
+
+**Reiniciar demonstração** é uma operação POST com confirmação no navegador e continua sendo o mecanismo explícito de restauração. Ela remove somente o diretório UUID validado da sessão atual, limpa autenticação e identificador e redireciona ao login; o próximo acesso recria o estado inicial. Diretórios UUID sem utilização há mais de 7 dias são removidos oportunisticamente, sem cron e sem tocar no ambiente atual, em links simbólicos ou no banco-modelo. O acesso normal atualiza a atividade do diretório.
+
+Os bancos e uploads temporários não são persistentes. Os 7 dias são o prazo de retenção da aplicação enquanto o armazenamento temporário da instância permanecer disponível; reinícios da infraestrutura do Render podem eliminar os dados antes desse prazo, quando serão recriados automaticamente. Esse desenho atende exclusivamente à demonstração acadêmica simultânea e não deve ser tratado como arquitetura recomendada para produção institucional.

@@ -160,3 +160,22 @@ A aplicacao possui dependencia `gunicorn`, utilizada em ambientes de hospedagem 
 ## Limitacoes
 
 Para uso real, ainda seriam necessarios aprimoramentos de seguranca, auditoria, protecao de dados pessoais, armazenamento adequado de arquivos, integracao com sistemas institucionais, validacoes normativas completas e infraestrutura de producao.
+# Isolamento do ambiente demonstrativo
+
+Esta versão acadêmica cria um ambiente temporário isolado para cada sessão do navegador. No primeiro acesso, o servidor gera um identificador aleatório com `uuid.uuid4().hex`, copia o banco-modelo `diarias.db` para o diretório temporário do sistema operacional e passa a executar todas as consultas e alterações somente nessa cópia. Os uploads seguem o mesmo isolamento.
+
+Estrutura de cada sessão:
+
+```text
+<diretório temporário>/diaria_digital_demo/<demo_environment_id>/
+├── diarias.db
+└── uploads/
+```
+
+Assim, solicitações, prestações de contas, aprovações, usuários e anexos criados por um visitante não aparecem para outro. O logout remove apenas a autenticação e preserva o ambiente, permitindo alternar entre os perfis solicitante e validador no mesmo fluxo. A ação POST **Reiniciar demonstração** remove somente a cópia e os uploads da sessão atual; o próximo acesso recebe um ambiente limpo.
+
+O banco `diarias.db` incluído no projeto é um modelo inicial imutável durante o uso normal. Cada nova cópia garante os três acessos demonstrativos, prepara dinamicamente a viagem vencida do CPF `111.111.111-11` com retorno três dias antes da data atual e mantém o CPF `333.333.333-33` sem pendência vencida inicial. Ambientes abandonados após 7 dias sem utilização são removidos oportunisticamente quando outro ambiente é criado.
+
+A sessão do navegador também permanece válida por até 7 dias. Assim, fechar e reabrir normalmente o mesmo navegador não reinicia intencionalmente a demonstração: enquanto o cookie e os arquivos temporários ainda existirem, o mesmo ambiente será recuperado. **Reiniciar demonstração** continua sendo o mecanismo explícito para apagar os dados daquele ambiente e restaurar seu estado inicial.
+
+Os dados são deliberadamente temporários. Os 7 dias representam a retenção da aplicação enquanto o armazenamento temporário continuar disponível; uma reinicialização da infraestrutura do Render ainda pode eliminar esses arquivos antes desse prazo. Essa arquitetura existe para avaliação acadêmica simultânea; não é uma recomendação de armazenamento para uso institucional em produção.

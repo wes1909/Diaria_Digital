@@ -1,9 +1,13 @@
 import json
 import os
 import re
+import shutil
 import sqlite3
+import tempfile
 import unicodedata
+import uuid
 from datetime import datetime, timedelta
+from contextlib import closing
 from functools import wraps
 from pathlib import Path
 
@@ -11,6 +15,7 @@ from flask import (
     Flask,
     abort,
     flash,
+    has_request_context,
     redirect,
     render_template,
     request,
@@ -23,9 +28,11 @@ from werkzeug.utils import secure_filename
 
 
 BASE_DIR = Path(__file__).resolve().parent
-DATABASE = BASE_DIR / "diarias.db"
+DEMO_BASE_DATABASE = BASE_DIR / "diarias.db"
 LOCALITIES_FILE = BASE_DIR / "static" / "localidades.js"
-UPLOAD_FOLDER = BASE_DIR / "uploads"
+DEMO_BASE_UPLOAD_FOLDER = BASE_DIR / "uploads"
+DEMO_ENVIRONMENTS_ROOT = Path(tempfile.gettempdir()) / "diaria_digital_demo"
+DEMO_ENVIRONMENT_MAX_AGE = timedelta(days=7)
 ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "doc", "docx"}
 ACCOUNTABILITY_ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg"}
 ACCOUNTABILITY_DEADLINE_DAYS = 2
@@ -34,12 +41,13 @@ EXACT_12_HOURS_DAILY_FRACTION = 0.70
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "chave-academica-altere-em-producao"
-app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=7)
 
 DEMO_REQUESTER_EMAIL = "solicitante@academico.test"
 DEMO_VALIDATOR_EMAIL = "validador@academico.test"
 DEMO_REQUESTER_CPF = "11111111111"
 DEMO_VALIDATOR_CPF = "22222222222"
+DEMO_CLEAR_REQUESTER_CPF = "33333333333"
 
 DAILY_GROUPS = {
     "agente_politico_comissionado": "Prefeito Municipal, Vice-Prefeito, Vereadores e Secretários",
@@ -155,15 +163,173 @@ def legacy_email_for_cpf(cpf):
     return f"{cpf}@cpf.local"
 
 
-def get_db():
-    conn = sqlite3.connect(DATABASE)
+def is_valid_demo_environment_id(environment_id):
+    return bool(re.fullmatch(r"[0-9a-f]{32}", environment_id or ""))
+
+
+def get_demo_environment_folder(environment_id):
+    if not is_valid_demo_environment_id(environment_id):
+        raise ValueError("Identificador de ambiente demonstrativo invalido.")
+    return DEMO_ENVIRONMENTS_ROOT / environment_id
+
+
+def cleanup_old_demo_environments(current_environment_id=None):
+    """Remove somente ambientes UUID sem utilizacao ha mais de 7 dias."""
+    if not DEMO_ENVIRONMENTS_ROOT.exists():
+        return
+    cutoff = datetime.now().timestamp() - DEMO_ENVIRONMENT_MAX_AGE.total_seconds()
+    for candidate in DEMO_ENVIRONMENTS_ROOT.iterdir():
+        if (
+            not candidate.is_dir()
+            or candidate.is_symlink()
+            or not is_valid_demo_environment_id(candidate.name)
+            or candidate.name == current_environment_id
+        ):
+            continue
+        try:
+            if candidate.stat().st_mtime < cutoff:
+                shutil.rmtree(candidate)
+        except FileNotFoundError:
+            pass
+
+
+def copy_demo_base_uploads(database_path, upload_folder):
+    """Copia apenas arquivos referenciados pelo banco-base, quando existirem."""
+    if not DEMO_BASE_UPLOAD_FOLDER.is_dir():
+        return
+    with closing(sqlite3.connect(database_path)) as db:
+        filenames = [row[0] for row in db.execute("SELECT filename FROM attachments")]
+    for filename in filenames:
+        safe_name = Path(filename).name
+        if safe_name != filename:
+            continue
+        source = DEMO_BASE_UPLOAD_FOLDER / safe_name
+        if source.is_file():
+            shutil.copy2(source, upload_folder / safe_name)
+
+
+def prepare_demo_scenarios(database_path):
+    today = datetime.now().date()
+    overdue_return = today - timedelta(days=3)
+    overdue_departure = overdue_return - timedelta(days=1)
+    with closing(sqlite3.connect(database_path)) as db, db:
+        db.row_factory = sqlite3.Row
+        overdue_user = db.execute(
+            "SELECT id FROM users WHERE cpf = ?", (DEMO_REQUESTER_CPF,)
+        ).fetchone()
+        clear_user = db.execute(
+            "SELECT id FROM users WHERE cpf = ?", (DEMO_CLEAR_REQUESTER_CPF,)
+        ).fetchone()
+        if overdue_user:
+            scenario = db.execute(
+                """
+                SELECT id FROM requests
+                WHERE user_id = ? AND status = 'aprovada'
+                  AND (accountability_text IS NULL OR TRIM(accountability_text) = '')
+                ORDER BY id DESC LIMIT 1
+                """,
+                (overdue_user["id"],),
+            ).fetchone()
+            now = datetime.now().isoformat(timespec="seconds")
+            if scenario:
+                db.execute(
+                    """
+                    UPDATE requests
+                    SET departure_date = ?, return_date = ?, status = 'aprovada',
+                        accountability_text = NULL, updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (overdue_departure.isoformat(), overdue_return.isoformat(), now, scenario["id"]),
+                )
+            else:
+                db.execute(
+                    """
+                    INSERT INTO requests (
+                        user_id, destination, departure_date, return_date, objective,
+                        estimated_amount, status, accountability_text, created_at, updated_at,
+                        daily_group, daily_range, has_overnight, departure_time, return_time,
+                        distance_km, daily_factor, base_amount, overnight_count, daily_quantity
+                    ) VALUES (?, ?, ?, ?, ?, ?, 'aprovada', NULL, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        overdue_user["id"], "Florianopolis - SC",
+                        overdue_departure.isoformat(), overdue_return.isoformat(),
+                        "Cenario demonstrativo de prestacao de contas", 800.0, now, now,
+                        "servidor_geral", "capital_sc_ou_fora_ate_1000", "08:00", "18:00",
+                        320.0, 1.0, 800.0, 1, 1.0,
+                    ),
+                )
+        if clear_user:
+            # Mantem eventuais viagens-base, mas impede que comecem vencidas.
+            db.execute(
+                """
+                UPDATE requests SET return_date = ?, updated_at = ?
+                WHERE user_id = ? AND return_date <= ? AND (
+                    (status = 'aprovada' AND (accountability_text IS NULL OR TRIM(accountability_text) = ''))
+                    OR status = 'prestacao_correcao_solicitada'
+                )
+                """,
+                (today.isoformat(), datetime.now().isoformat(timespec="seconds"),
+                 clear_user["id"], (today - timedelta(days=2)).isoformat()),
+            )
+
+
+def create_demo_environment(environment_id):
+    if not DEMO_BASE_DATABASE.is_file():
+        raise RuntimeError("Banco-base da demonstracao nao encontrado.")
+    DEMO_ENVIRONMENTS_ROOT.mkdir(parents=True, exist_ok=True)
+    cleanup_old_demo_environments(environment_id)
+    environment_folder = get_demo_environment_folder(environment_id)
+    environment_folder.mkdir(exist_ok=True)
+    upload_folder = environment_folder / "uploads"
+    upload_folder.mkdir(exist_ok=True)
+    database_path = environment_folder / "diarias.db"
+    temporary_database = environment_folder / "diarias.db.preparing"
+    shutil.copy2(DEMO_BASE_DATABASE, temporary_database)
+    init_db(temporary_database)
+    prepare_demo_scenarios(temporary_database)
+    copy_demo_base_uploads(temporary_database, upload_folder)
+    temporary_database.replace(database_path)
+    return database_path
+
+
+def get_demo_environment_id():
+    if not has_request_context():
+        raise RuntimeError("O ambiente demonstrativo exige um contexto de requisicao.")
+    session.permanent = True
+    environment_id = session.get("demo_environment_id")
+    if not is_valid_demo_environment_id(environment_id):
+        environment_id = uuid.uuid4().hex
+        session["demo_environment_id"] = environment_id
+    return environment_id
+
+
+def get_demo_database_path():
+    environment_id = get_demo_environment_id()
+    environment_folder = get_demo_environment_folder(environment_id)
+    database_path = environment_folder / "diarias.db"
+    if not database_path.is_file():
+        create_demo_environment(environment_id)
+    os.utime(environment_folder, None)
+    return database_path
+
+
+def get_demo_upload_folder():
+    database_path = get_demo_database_path()
+    upload_folder = database_path.parent / "uploads"
+    upload_folder.mkdir(exist_ok=True)
+    return upload_folder
+
+
+def get_db(database_path=None):
+    path = Path(database_path) if database_path is not None else get_demo_database_path()
+    conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     return conn
 
 
-def init_db():
-    UPLOAD_FOLDER.mkdir(exist_ok=True)
-    with get_db() as db:
+def init_db(database_path):
+    with closing(get_db(database_path)) as db, db:
         db.executescript(
             """
             CREATE TABLE IF NOT EXISTS users (
@@ -330,11 +496,41 @@ def init_db():
             "ON users(cpf) WHERE cpf IS NOT NULL AND cpf != ''"
         )
 
+        demo_users = [
+            ("Solicitante com prestacao em atraso", DEMO_REQUESTER_CPF, "solicitante", "servidor_geral", "0001", "Servidor Publico"),
+            ("Servidor Validador", DEMO_VALIDATOR_CPF, "validador", None, "0002", "Servidor Validador"),
+            ("Servidor solicitante sem pendencia", DEMO_CLEAR_REQUESTER_CPF, "solicitante", "agente_politico_comissionado", "0003", "Empregado publico"),
+        ]
+        for name, cpf, role, daily_group, registration, public_position in demo_users:
+            existing_demo_user = db.execute(
+                "SELECT id FROM users WHERE cpf = ?", (cpf,)
+            ).fetchone()
+            if existing_demo_user:
+                db.execute(
+                    """
+                    UPDATE users SET password_hash = ?, role = ?, daily_group = ?,
+                        registration = COALESCE(registration, ?),
+                        public_position = COALESCE(public_position, ?)
+                    WHERE id = ?
+                    """,
+                    (generate_password_hash("123456"), role, daily_group,
+                     registration, public_position, existing_demo_user["id"]),
+                )
+            else:
+                db.execute(
+                    """
+                    INSERT INTO users (name, email, cpf, password_hash, role, daily_group, registration, public_position)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (name, legacy_email_for_cpf(cpf), cpf, generate_password_hash("123456"),
+                     role, daily_group, registration, public_position),
+                )
+
 
 def current_user():
     if "user_id" not in session:
         return None
-    with get_db() as db:
+    with closing(get_db()) as db, db:
         return db.execute("SELECT * FROM users WHERE id = ?", (session["user_id"],)).fetchone()
 
 
@@ -516,7 +712,7 @@ def calculate_daily_amount(daily_group, daily_range, daily_quantity):
 
 def get_overdue_accountability(user_id):
     deadline_date = (datetime.now().date() - timedelta(days=ACCOUNTABILITY_DEADLINE_DAYS)).isoformat()
-    with get_db() as db:
+    with closing(get_db()) as db, db:
         return db.execute(
             """
             SELECT *
@@ -736,7 +932,7 @@ def get_process_progress(status):
 
 
 def get_user_or_404(user_id):
-    with get_db() as db:
+    with closing(get_db()) as db, db:
         user = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
     if user is None:
         abort(404)
@@ -761,7 +957,7 @@ def validate_user_form(form, user_id=None, password_required=False):
     if password and len(password) < 6:
         raise ValueError("A senha deve ter ao menos 6 caracteres.")
 
-    with get_db() as db:
+    with closing(get_db()) as db, db:
         existing = db.execute(
             "SELECT id FROM users WHERE cpf = ? AND (? IS NULL OR id != ?)",
             (cpf, user_id, user_id),
@@ -797,9 +993,9 @@ def save_attachment(file_storage, request_id, kind, attachment_type=None, allowe
     original_name = file_storage.filename
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
     filename = f"{request_id}_{kind}_{timestamp}_{secure_filename(original_name)}"
-    file_storage.save(UPLOAD_FOLDER / filename)
+    file_storage.save(get_demo_upload_folder() / filename)
 
-    with get_db() as db:
+    with closing(get_db()) as db, db:
         db.execute(
             """
             INSERT INTO attachments (request_id, filename, original_name, kind, attachment_type, uploaded_at)
@@ -817,7 +1013,7 @@ def save_attachment(file_storage, request_id, kind, attachment_type=None, allowe
 
 
 def get_request_or_404(request_id):
-    with get_db() as db:
+    with closing(get_db()) as db, db:
         daily_request = db.execute(
             """
             SELECT r.*, u.name AS requester_name, u.cpf AS requester_cpf,
@@ -856,7 +1052,7 @@ def accountability_form_context(daily_request, attachments=None):
 
 
 def get_attachments(request_id):
-    with get_db() as db:
+    with closing(get_db()) as db, db:
         return db.execute(
             "SELECT * FROM attachments WHERE request_id = ? ORDER BY uploaded_at DESC",
             (request_id,),
@@ -939,11 +1135,14 @@ def login():
             flash("Informe um CPF com 11 digitos.", "danger")
             return render_template("login.html")
 
-        with get_db() as db:
+        with closing(get_db()) as db, db:
             user = db.execute("SELECT * FROM users WHERE cpf = ?", (cpf,)).fetchone()
 
         if user and check_password_hash(user["password_hash"], password):
+            environment_id = session.get("demo_environment_id")
             session.clear()
+            session.permanent = True
+            session["demo_environment_id"] = environment_id
             session["user_id"] = user["id"]
             flash("Login realizado com sucesso.", "success")
             return redirect(url_for("index"))
@@ -955,8 +1154,20 @@ def login():
 
 @app.route("/logout")
 def logout():
-    session.clear()
+    session.pop("user_id", None)
     flash("Sessão encerrada.", "info")
+    return redirect(url_for("login"))
+
+
+@app.route("/reiniciar-demonstracao", methods=["POST"])
+def reset_demo_environment():
+    environment_id = session.get("demo_environment_id")
+    if is_valid_demo_environment_id(environment_id):
+        environment_folder = get_demo_environment_folder(environment_id)
+        if environment_folder.is_dir() and not environment_folder.is_symlink():
+            shutil.rmtree(environment_folder)
+    session.clear()
+    flash("Ambiente de demonstracao reiniciado com sucesso.", "success")
     return redirect(url_for("login"))
 
 
@@ -986,7 +1197,7 @@ def users_list():
         params.extend([f"%{search}%", f"%{search}%", f"%{normalized_search or search}%"])
 
     where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
-    with get_db() as db:
+    with closing(get_db()) as db, db:
         users = db.execute(
             f"SELECT * FROM users {where_clause} ORDER BY name",
             params,
@@ -1016,7 +1227,7 @@ def new_user():
             flash(str(error), "danger")
             return render_template("user_form.html", user=None, form_action=url_for("new_user"))
 
-        with get_db() as db:
+        with closing(get_db()) as db, db:
             db.execute(
                 """
                 INSERT INTO users (
@@ -1071,7 +1282,7 @@ def edit_user(user_id):
                 form_action=url_for("edit_user", user_id=user_id),
             )
 
-        with get_db() as db:
+        with closing(get_db()) as db, db:
             db.execute(
                 """
                 UPDATE users
@@ -1125,7 +1336,7 @@ def requester_dashboard():
         params.append(f"%{search}%")
 
     where_clause = " AND ".join(filters)
-    with get_db() as db:
+    with closing(get_db()) as db, db:
         requests = db.execute(
             f"SELECT * FROM requests WHERE {where_clause} ORDER BY created_at DESC",
             params,
@@ -1159,7 +1370,7 @@ def new_request():
             return render_template("request_form.html", **request_form_context(user))
 
         now = datetime.now().isoformat(timespec="seconds")
-        with get_db() as db:
+        with closing(get_db()) as db, db:
             cursor = db.execute(
                 """
                 INSERT INTO requests (
@@ -1220,7 +1431,7 @@ def edit_request(request_id):
             flash(str(error), "danger")
             return render_template("request_form.html", **request_form_context(user, daily_request))
 
-        with get_db() as db:
+        with closing(get_db()) as db, db:
             db.execute(
                 """
                 UPDATE requests
@@ -1314,7 +1525,7 @@ def submit_accountability(request_id):
     if daily_request["status"] == "prestacao_correcao_solicitada":
         status = "prestacao_corrigida"
 
-    with get_db() as db:
+    with closing(get_db()) as db, db:
         db.execute(
             """
             UPDATE requests
@@ -1375,7 +1586,7 @@ def validator_dashboard():
         params.extend([f"%{search}%", f"%{search}%"])
 
     where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
-    with get_db() as db:
+    with closing(get_db()) as db, db:
         requests = db.execute(
             f"""
             SELECT r.*, u.name AS requester_name
@@ -1419,7 +1630,7 @@ def evaluate_request(request_id):
     if action not in status_map:
         abort(400)
 
-    with get_db() as db:
+    with closing(get_db()) as db, db:
         db.execute(
             """
             UPDATE requests
@@ -1436,9 +1647,8 @@ def evaluate_request(request_id):
 @app.route("/uploads/<path:filename>")
 @login_required
 def uploaded_file(filename):
-    return send_from_directory(app.config["UPLOAD_FOLDER"], filename, as_attachment=True)
+    return send_from_directory(get_demo_upload_folder(), filename, as_attachment=True)
 
 
 if __name__ == "__main__":
-    init_db()
     app.run(debug=True)

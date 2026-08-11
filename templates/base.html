@@ -20,6 +20,9 @@
                         <a href="{{ url_for('profile') }}">Meu cadastro</a>
                     {% endif %}
                     <a href="{{ url_for('logout') }}">Sair</a>
+                    <form class="demo-reset-form" method="post" action="{{ url_for('reset_demo_environment') }}" onsubmit="return confirm('Deseja reiniciar este ambiente de demonstração? Todas as solicitações, usuários adicionais, prestações de contas e anexos criados durante este teste serão removidos. Somente esta sessão será afetada.');">
+                        <button type="submit" class="demo-reset-button" title="Restaura os dados deste ambiente de teste ao estado inicial. As ações de outros visitantes não são afetadas.">Reiniciar demonstração</button>
+                    </form>
                 </nav>
             {% endif %}
             <button type="button" class="contrast-toggle" data-contrast-toggle aria-pressed="false">
