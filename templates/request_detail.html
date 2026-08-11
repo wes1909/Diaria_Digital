@@ -15,7 +15,7 @@
         <span>{{ daily_request["destination"] }}</span>
     </div>
     <div>
-        <strong>Distância considerada</strong>
+        <strong class="label-with-tooltip">Distância considerada <span class="info-tooltip" tabindex="0" role="button" aria-label="Informacao: Distância rodoviária aproximada entre Lebon Régis e o município de destino, utilizada para definir a faixa de cálculo da diária.">&#9432;<span class="tooltip-text" role="tooltip">Distância rodoviária aproximada entre Lebon Régis e o município de destino, utilizada para definir a faixa de cálculo da diária.</span></span></strong>
         <span>{{ (daily_request["distance_km"]|decimal_br(0) ~ " km") if daily_request["distance_km"] is not none else "n?o cadastrada" }}</span>
     </div>
     <div>
@@ -23,11 +23,11 @@
         <span>{{ daily_request["departure_date"]|date_br }} {{ daily_request["departure_time"] or "--:--" }} a {{ daily_request["return_date"]|date_br }} {{ daily_request["return_time"] or "--:--" }}</span>
     </div>
     <div>
-        <strong>Duração prevista</strong>
+        <strong class="label-with-tooltip">Duração prevista <span class="info-tooltip" tabindex="0" role="button" aria-label="Informacao: Tempo calculado automaticamente entre a data e a hora de saída e a data e a hora prevista de retorno.">&#9432;<span class="tooltip-text" role="tooltip">Tempo calculado automaticamente entre a data e a hora de saída e a data e a hora prevista de retorno.</span></span></strong>
         <span>{{ daily_request|duration_br }}</span>
     </div>
     <div>
-        <strong>Valor total da diária</strong>
+        <strong class="label-with-tooltip">Valor total da diária <span class="info-tooltip" tabindex="0" role="button" aria-label="Informacao: Valor calculado automaticamente a partir do valor-base e do fator correspondente ao período do afastamento.">&#9432;<span class="tooltip-text" role="tooltip">Valor calculado automaticamente a partir do valor-base e do fator correspondente ao período do afastamento.</span></span></strong>
         <span>R$ {{ daily_request["estimated_amount"]|moeda_br }}</span>
     </div>
     {% if daily_request["daily_group"] %}
@@ -38,20 +38,20 @@
     {% endif %}
     {% if daily_request["daily_range"] %}
         <div>
-            <strong>Faixa identificada pelo sistema</strong>
+            <strong class="label-with-tooltip">Faixa identificada pelo sistema <span class="info-tooltip" tabindex="0" role="button" aria-label="Informacao: Classificação definida automaticamente conforme a distância do destino e as regras aplicáveis à concessão de diárias.">&#9432;<span class="tooltip-text" role="tooltip">Classificação definida automaticamente conforme a distância do destino e as regras aplicáveis à concessão de diárias.</span></span></strong>
             <span>{{ daily_ranges.get(daily_request["daily_range"], daily_request["daily_range"]) }}</span>
         </div>
     {% endif %}
     <div>
-        <strong>Pernoite</strong>
-        <span>{{ "Sim" if daily_request["has_overnight"] else "Não" }}</span>
+        <strong>Quantidade de pernoites</strong>
+        <span>{{ daily_request["overnight_count"] if daily_request["overnight_count"] is not none else (1 if daily_request["has_overnight"] else 0) }}</span>
     </div>
     <div>
-        <strong>Fator aplicado</strong>
-        <span>{{ daily_request["daily_factor"]|decimal_br(2) }}</span>
+        <strong class="label-with-tooltip">Quantidade de diárias <span class="info-tooltip" tabindex="0" role="button" aria-label="Informacao: Quantidade calculada automaticamente a partir da duração total do afastamento e dos pernoites informados.">&#9432;<span class="tooltip-text" role="tooltip">Quantidade calculada automaticamente a partir da duração total do afastamento e dos pernoites informados.</span></span></strong>
+        <span>{{ (daily_request["daily_quantity"] if daily_request["daily_quantity"] is not none else daily_request["daily_factor"])|daily_quantity_br }}</span>
     </div>
     <div>
-        <strong>Valor-base</strong>
+        <strong class="label-with-tooltip">Valor-base <span class="info-tooltip" tabindex="0" role="button" aria-label="Informacao: Valor integral da diária correspondente ao grupo funcional do servidor e à faixa da viagem.">&#9432;<span class="tooltip-text" role="tooltip">Valor integral da diária correspondente ao grupo funcional do servidor e à faixa da viagem.</span></span></strong>
         <span>{{ ("R$ " ~ (daily_request["base_amount"]|moeda_br)) if daily_request["base_amount"] is not none else "-" }}</span>
     </div>
     <div>
@@ -161,4 +161,8 @@
         </div>
     {% endif %}
 </section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='tooltips.js') }}"></script>
 {% endblock %}

@@ -29,7 +29,8 @@
                 <option value="">Selecione primeiro o estado</option>
             </select>
             <input type="hidden" id="destinationInput" name="destination" required>
-            <span id="destinationDistance" class="muted">Dist?ncia aproximada de Lebon R?gis: -</span>
+            <span class="field-hint-label label-with-tooltip">Distância aproximada <span class="info-tooltip" tabindex="0" role="button" aria-label="Informacao: Distância rodoviária aproximada entre Lebon Régis e o município de destino, utilizada para definir a faixa de cálculo da diária.">&#9432;<span class="tooltip-text" role="tooltip">Distância rodoviária aproximada entre Lebon Régis e o município de destino, utilizada para definir a faixa de cálculo da diária.</span></span></span>
+            <span id="destinationDistance" class="muted">Distância aproximada de Lebon Régis: -</span>
         </label>
         <label class="required">
             Data de saída
@@ -59,11 +60,9 @@
             <input id="dailyGroupSelect" type="hidden" value="{{ user_daily_group or '' }}">
         </div>
         <label class="required">
-            Haverá pernoite?
-            <select id="overnightSelect" name="has_overnight" required>
-                <option value="1" {% if not daily_request or daily_request["has_overnight"] %}selected{% endif %}>Sim</option>
-                <option value="0" {% if daily_request and not daily_request["has_overnight"] %}selected{% endif %}>Não</option>
-            </select>
+            <span class="label-with-tooltip">Quantidade de pernoites <span class="info-tooltip" tabindex="0" role="button" aria-label="Informacao: Informe quantas noites o servidor permanecerá fora da sede durante o afastamento. O sistema utiliza essa informação juntamente com a duração da viagem para calcular a quantidade de diárias.">&#9432;<span class="tooltip-text" role="tooltip">Informe quantas noites o servidor permanecerá fora da sede durante o afastamento. O sistema utiliza essa informação juntamente com a duração da viagem para calcular a quantidade de diárias.</span></span></span>
+            <input id="overnightCount" type="number" name="overnight_count" min="0" step="1" required value="{{ daily_request['overnight_count'] if daily_request and daily_request['overnight_count'] is not none else (1 if daily_request and daily_request['has_overnight'] else 0) }}">
+            <span id="overnightLimitHint" class="muted">Máximo possível para este período: -</span>
         </label>
         <label class="required">
             Valor total
@@ -78,33 +77,37 @@
             <span id="summaryDestination">-</span>
         </div>
         <div>
-            <strong>Distância aproximada</strong>
+            <strong class="label-with-tooltip">Distância aproximada <span class="info-tooltip" tabindex="0" role="button" aria-label="Informacao: Distância rodoviária aproximada entre Lebon Régis e o município de destino, utilizada para definir a faixa de cálculo da diária.">&#9432;<span class="tooltip-text" role="tooltip">Distância rodoviária aproximada entre Lebon Régis e o município de destino, utilizada para definir a faixa de cálculo da diária.</span></span></strong>
             <span id="summaryDistance">-</span>
         </div>
         <div>
-            <strong>Duração prevista</strong>
+            <strong class="label-with-tooltip">Duração prevista <span class="info-tooltip" tabindex="0" role="button" aria-label="Informacao: Tempo calculado automaticamente entre a data e a hora de saída e a data e a hora prevista de retorno.">&#9432;<span class="tooltip-text" role="tooltip">Tempo calculado automaticamente entre a data e a hora de saída e a data e a hora prevista de retorno.</span></span></strong>
             <span id="summaryDuration">-</span>
         </div>
         <div>
-            <strong>Faixa identificada pelo sistema</strong>
+            <strong>Quantidade de pernoites</strong>
+            <span id="summaryOvernightCount">0</span>
+        </div>
+        <div>
+            <strong class="label-with-tooltip">Faixa identificada pelo sistema <span class="info-tooltip" tabindex="0" role="button" aria-label="Informacao: Classificação definida automaticamente conforme a distância do destino e as regras aplicáveis à concessão de diárias.">&#9432;<span class="tooltip-text" role="tooltip">Classificação definida automaticamente conforme a distância do destino e as regras aplicáveis à concessão de diárias.</span></span></strong>
             <span id="summaryRange">-</span>
         </div>
         <div>
-            <strong>Fator aplicado</strong>
-            <span id="summaryFactor">-</span>
+            <strong class="label-with-tooltip">Quantidade de diárias <span class="info-tooltip" tabindex="0" role="button" aria-label="Informacao: Quantidade calculada automaticamente a partir da duração total do afastamento e dos pernoites informados.">&#9432;<span class="tooltip-text" role="tooltip">Quantidade calculada automaticamente a partir da duração total do afastamento e dos pernoites informados.</span></span></strong>
+            <span id="summaryDailyQuantity">-</span>
         </div>
         <div>
-            <strong>Valor-base</strong>
+            <strong class="label-with-tooltip">Valor-base <span class="info-tooltip" tabindex="0" role="button" aria-label="Informacao: Valor integral da diária correspondente ao grupo funcional do servidor e à faixa da viagem.">&#9432;<span class="tooltip-text" role="tooltip">Valor integral da diária correspondente ao grupo funcional do servidor e à faixa da viagem.</span></span></strong>
             <span id="summaryBaseAmount">-</span>
         </div>
         <div>
-            <strong>Valor total estimado</strong>
+            <strong class="label-with-tooltip">Valor total estimado <span class="info-tooltip" tabindex="0" role="button" aria-label="Informacao: Valor calculado automaticamente a partir do valor-base e do fator correspondente ao período do afastamento.">&#9432;<span class="tooltip-text" role="tooltip">Valor calculado automaticamente a partir do valor-base e do fator correspondente ao período do afastamento.</span></span></strong>
             <span id="summaryTotalAmount">R$ 0,00</span>
         </div>
     </section>
 
     <label class="required">
-        Objetivo da viagem
+        <span class="label-with-tooltip">Objetivo da viagem <span class="info-tooltip" tabindex="0" role="button" aria-label="Informacao: Descreva de forma resumida a finalidade institucional do deslocamento.">&#9432;<span class="tooltip-text" role="tooltip">Descreva de forma resumida a finalidade institucional do deslocamento.</span></span></span>
         <textarea name="objective" rows="5" required lang="pt-BR" spellcheck="true" placeholder="Descreva a finalidade institucional da viagem">{{ daily_request["objective"] if daily_request else "" }}</textarea>
     </label>
     <label>
@@ -124,4 +127,5 @@
 <script src="{{ url_for('static', filename='calculo_diarias.js') }}"></script>
 <script src="{{ url_for('static', filename='restricoes_datas.js') }}"></script>
 <script src="{{ url_for('static', filename='campos_obrigatorios.js') }}"></script>
+<script src="{{ url_for('static', filename='tooltips.js') }}"></script>
 {% endblock %}

@@ -27,10 +27,10 @@ Usuarios demonstrativos recriados na base limpa:
 ## Fluxo Principal
 
 1. O solicitante acessa o sistema.
-2. Cadastra uma solicitacao com destino, datas, horarios, pernoite, objetivo e anexos opcionais.
+2. Cadastra uma solicitacao com destino, datas, horarios, quantidade de pernoites, objetivo e anexos opcionais.
 3. O sistema identifica a faixa da viagem automaticamente a partir do municipio escolhido e da distancia cadastrada.
-4. O backend calcula valor-base, fator aplicavel e valor total estimado antes de salvar.
-5. O validador analisa a solicitacao com acesso ao destino, distancia, horarios, duracao, faixa, fator, valor-base e valor total.
+4. O backend calcula valor-base, quantidade total de diarias e valor total estimado antes de salvar.
+5. O validador analisa a solicitacao com acesso ao destino, distancia, horarios, duracao, faixa, quantidade de pernoites, quantidade de diarias, valor-base e valor total.
 6. O validador pode aprovar, rejeitar ou solicitar correcao.
 7. Apos aprovacao da viagem, o solicitante envia a prestacao de contas.
 8. O validador avalia a prestacao e pode aprovar, aprovar com ressalvas, rejeitar ou solicitar correcao.
@@ -69,17 +69,27 @@ Regras:
 
 Se a distancia necessaria nao estiver cadastrada, o backend bloqueia o salvamento e informa que a distancia do municipio precisa ser preenchida.
 
-## Duracao, Pernoite e Fator
+## Duracao, Pernoites e Quantidade de Diarias
 
-A solicitacao possui agora `departure_time` e `return_time`, informados em campos HTML `time`. O backend combina data e hora de saida com data e hora de retorno e valida que o retorno seja posterior a saida.
+A solicitacao possui `departure_time` e `return_time`. O backend combina data e hora de saida com data e hora de retorno e valida que o retorno seja posterior a saida.
 
-A pergunta visivel passa a ser "Havera pernoite?". O fator e calculado pela funcao `calculate_daily_factor()`:
+O campo visivel passou a ser "Quantidade de pernoites". O usuario informa um numero inteiro maior ou igual a zero. O backend valida essa quantidade por `validate_overnight_count()`, impedindo valores negativos, decimais, maiores que o maximo possivel entre as datas ou maiores que zero quando saida e retorno ocorrem no mesmo dia.
 
-- Duracao superior a 12 horas com pernoite: fator 1,00.
-- Duracao superior a 12 horas sem pernoite: fator 0,70.
-- Duracao inferior a 12 horas sem pernoite: fator 0,50.
+A quantidade total de diarias e calculada por `calculate_daily_quantity()`. A versao demonstrativa utiliza uma regra operacional para decompor afastamentos superiores a 24 horas em blocos completos e periodo residual. Essa logica foi isolada para permitir adequacao futura caso exista regulamentacao administrativa especifica sobre a forma de calculo de multiplas diarias.
 
-A legislacao informada nao definiu explicitamente o caso de duracao exatamente igual a 12 horas nem o tratamento detalhado para viagens de multiplos dias. Por isso, a regra foi mantida isolada no backend para ajuste posterior. O sistema nao cria multiplicador juridico adicional para multiplos dias sem definicao legal expressa.
+Regra operacional demonstrativa:
+
+- Cada bloco completo de 24 horas corresponde a 1,00 diaria.
+- O residual superior a 12 horas recebe 1,00 diaria se houver pernoite associado ao residual.
+- O residual superior a 12 horas recebe 0,70 diaria se nao houver pernoite associado ao residual.
+- O residual inferior a 12 horas sem pernoite associado recebe 0,50 diaria.
+- Os blocos completos de 24 horas consomem, no maximo, um pernoite cada. Se a quantidade informada exceder os blocos completos, o residual e considerado com pernoite.
+
+A decomposicao acima nao deve ser apresentada como texto literal da Lei Municipal n. 1.839/2026. Ela e uma regra operacional da versao academica.
+
+O caso exatamente igual a 12 horas permanece documentado como ambiguo no trecho legal usado. Para permitir o calculo na demonstracao, a constante `EXACT_12_HOURS_DAILY_FRACTION` define 0,70 diaria para residual exatamente igual a 12 horas sem pernoite associado.
+
+O valor total passa a ser: `valor-base * daily_quantity`. O campo antigo `daily_factor` permanece como legado tecnico/fallback, mas novas solicitacoes usam `daily_quantity` e `overnight_count`.
 
 ## Banco de Dados
 
@@ -90,8 +100,10 @@ O `init_db()` continua usando migracoes incrementais com `ALTER TABLE`, preserva
 | `departure_time` | Hora de saida prevista |
 | `return_time` | Hora prevista de retorno |
 | `distance_km` | Copia historica da distancia usada no calculo |
-| `daily_factor` | Fator aplicado conforme duracao e pernoite |
+| `daily_factor` | Campo legado/fallback do fator antigo |
 | `base_amount` | Valor-base da diaria usado no calculo |
+| `overnight_count` | Quantidade de pernoites informada e validada |
+| `daily_quantity` | Quantidade total de diarias calculada |
 
 A copia da distancia na solicitacao preserva o historico caso a distancia cadastrada para um municipio seja alterada futuramente.
 
@@ -121,7 +133,7 @@ Nao foram inseridas distancias ficticias. Os municipios que nao possuem valor co
 ## Principais Arquivos
 
 - `app.py`: rotas, regras de negocio, migracoes SQLite, validacoes e calculo definitivo no backend.
-- `templates/request_form.html`: formulario de solicitacao com destino, datas, horarios, pernoite e resumo de calculo.
+- `templates/request_form.html`: formulario de solicitacao com destino, datas, horarios, quantidade de pernoites e resumo de calculo.
 - `templates/request_detail.html`: tela de detalhe, avaliacao e conferencia do calculo.
 - `templates/requester_dashboard.html`: painel do solicitante.
 - `templates/validator_dashboard.html`: painel do validador.
@@ -133,6 +145,7 @@ Nao foram inseridas distancias ficticias. Os municipios que nao possuem valor co
 - `static/restricoes_datas.js`: regras visuais para datas da solicitacao.
 - `static/prestacao.js`: mascaras e regras visuais da prestacao de contas.
 - `static/campos_obrigatorios.js`: validacao visual de campos obrigatorios.
+- `static/tooltips.js`: comportamento dos icones de informacao acessiveis por foco, mouse e toque.
 - `static/cpf.js`: mascara visual de CPF no login e no cadastro de servidores.
 - `static/estilos.css`: estilos e responsividade.
 
@@ -154,10 +167,12 @@ Nao foram inseridas distancias ficticias. Os municipios que nao possuem valor co
 | `distance_km` | Distancia usada no calculo |
 | `daily_group` | Grupo funcional do servidor |
 | `daily_range` | Faixa automatica da viagem |
-| `daily_factor` | Fator aplicado pela duracao/pernoite |
+| `daily_factor` | Campo legado/fallback do fator antigo |
+| `overnight_count` | Quantidade de pernoites |
+| `daily_quantity` | Quantidade total de diarias |
 | `base_amount` | Valor-base da faixa |
 | `estimated_amount` | Valor total calculado |
-| `has_overnight` | Indica se havera pernoite |
+| `has_overnight` | Campo legado; novas solicitacoes usam `overnight_count` |
 | `validator_comment` | Parecer do validador |
 | `accountability_text` | Resumo da prestacao de contas |
 | `transport_mode` | Meio de transporte utilizado |

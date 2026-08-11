@@ -1041,3 +1041,125 @@ tr:last-child td {
         content: none;
     }
 }
+
+
+/* Tooltips informativos */
+.field-hint-label {
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 700;
+    margin-top: -2px;
+}
+
+.label-with-tooltip {
+    align-items: center;
+    display: inline-flex;
+    gap: 6px;
+    min-width: 0;
+}
+
+.info-tooltip {
+    align-items: center;
+    border-radius: 999px;
+    color: var(--muted);
+    cursor: help;
+    display: inline-flex;
+    flex: 0 0 auto;
+    font-size: 13px;
+    font-weight: 700;
+    height: 18px;
+    justify-content: center;
+    line-height: 1;
+    outline: none;
+    position: relative;
+    width: 18px;
+}
+
+.info-tooltip:hover,
+.info-tooltip:focus-visible,
+.info-tooltip.is-open {
+    color: var(--primary-dark);
+}
+
+.info-tooltip:focus-visible {
+    box-shadow: 0 0 0 3px rgba(42, 101, 151, 0.18);
+}
+
+.tooltip-text {
+    background: #1f2937;
+    border-radius: 6px;
+    bottom: calc(100% + 8px);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.18);
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 500;
+    left: 50%;
+    line-height: 1.45;
+    max-width: min(280px, calc(100vw - 32px));
+    opacity: 0;
+    padding: 9px 10px;
+    pointer-events: none;
+    position: absolute;
+    text-align: left;
+    transform: translate(-50%, 4px);
+    transition: opacity 0.16s ease, transform 0.16s ease;
+    visibility: hidden;
+    width: max-content;
+    z-index: 20;
+}
+
+.tooltip-text::after {
+    border: 6px solid transparent;
+    border-top-color: #1f2937;
+    content: "";
+    left: 50%;
+    position: absolute;
+    top: 100%;
+    transform: translateX(-50%);
+}
+
+.info-tooltip:hover .tooltip-text,
+.info-tooltip:focus .tooltip-text,
+.info-tooltip.is-open .tooltip-text {
+    opacity: 1;
+    transform: translate(-50%, 0);
+    visibility: visible;
+}
+
+.high-contrast .info-tooltip {
+    color: #ffffff;
+}
+
+.high-contrast .tooltip-text {
+    background: #ffffff;
+    color: #000000;
+}
+
+.high-contrast .tooltip-text::after {
+    border-top-color: #ffffff;
+}
+
+@media (max-width: 640px) {
+    .label-with-tooltip {
+        align-items: flex-start;
+    }
+
+    .tooltip-text {
+        left: auto;
+        right: -8px;
+        transform: translateY(4px);
+        width: min(260px, calc(100vw - 48px));
+    }
+
+    .tooltip-text::after {
+        left: auto;
+        right: 10px;
+        transform: none;
+    }
+
+    .info-tooltip:hover .tooltip-text,
+    .info-tooltip:focus .tooltip-text,
+    .info-tooltip.is-open .tooltip-text {
+        transform: translateY(0);
+    }
+}

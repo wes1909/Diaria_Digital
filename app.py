@@ -29,6 +29,8 @@ UPLOAD_FOLDER = BASE_DIR / "uploads"
 ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "doc", "docx"}
 ACCOUNTABILITY_ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg"}
 ACCOUNTABILITY_DEADLINE_DAYS = 2
+# Regra operacional demonstrativa para o caso exatamente igual a 12h, nao definido expressamente na referencia legal usada no projeto.
+EXACT_12_HOURS_DAILY_FRACTION = 0.70
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "chave-academica-altere-em-producao"
@@ -193,6 +195,8 @@ def init_db():
             "distance_km": "REAL",
             "daily_factor": "REAL",
             "base_amount": "REAL",
+            "overnight_count": "INTEGER DEFAULT 0",
+            "daily_quantity": "REAL",
         }
         for column_name, column_definition in columns_to_add.items():
             if column_name not in existing_columns:
@@ -316,8 +320,10 @@ def load_locality_distances():
     match = re.search(r"const\s+distanciasLocalidadesKm\s*=\s*(\{.*?\});", source, re.S)
     if not match:
         return {}
+    js_object = re.sub(r"//.*", "", match.group(1))
+    js_object = re.sub(r",\s*}", "}", js_object)
     try:
-        return json.loads(match.group(1))
+        return json.loads(js_object)
     except json.JSONDecodeError:
         return {}
 
@@ -409,23 +415,62 @@ def validate_travel_period(departure_date, departure_time, return_date, return_t
     return (return_ - departure).total_seconds() / 3600
 
 
-def calculate_daily_factor(duration_hours, has_overnight):
-    if has_overnight:
-        if duration_hours <= 12:
-            raise ValueError("Pernoite só pode ser informado para deslocamentos superiores a 12 horas.")
+def calculate_max_overnights(departure_date, return_date):
+    departure = datetime.fromisoformat(departure_date).date()
+    return_ = datetime.fromisoformat(return_date).date()
+    return max((return_ - departure).days, 0)
+
+
+def validate_overnight_count(raw_value, departure_date, return_date):
+    value = (raw_value if raw_value not in (None, "") else "0")
+    value = str(value).strip()
+    if not re.fullmatch(r"\d+", value):
+        raise ValueError("Informe a quantidade de pernoites como numero inteiro maior ou igual a zero.")
+
+    overnight_count = int(value)
+    max_overnights = calculate_max_overnights(departure_date, return_date)
+    if overnight_count > max_overnights:
+        raise ValueError(f"A quantidade de pernoites nao pode ser maior que {max_overnights} para o periodo informado.")
+    if max_overnights == 0 and overnight_count > 0:
+        raise ValueError("Viagens com saida e retorno no mesmo dia devem ter zero pernoites.")
+    return overnight_count
+
+
+def calculate_residual_daily_fraction(residual_hours, has_residual_overnight):
+    if residual_hours <= 0:
+        return 0.0
+    if has_residual_overnight:
         return 1.0
-    if duration_hours > 12:
-        return 0.7
-    if duration_hours < 12:
-        return 0.5
-    raise ValueError("A legislação informada não define fator para deslocamento exatamente igual a 12 horas.")
+    if residual_hours > 12:
+        return 0.70
+    if residual_hours < 12:
+        return 0.50
+    # Decisao operacional demonstrativa: o caso exatamente 12h nao esta definido no trecho legal usado.
+    return EXACT_12_HOURS_DAILY_FRACTION
 
 
-def calculate_daily_amount(daily_group, daily_range, daily_factor):
+def calculate_daily_quantity(duration_hours, overnight_count):
+    """
+    Regra operacional demonstrativa para multiplas diarias.
+
+    A referencia legal do projeto define fracoes para periodos simples, mas nao detalha
+    decomposicao de afastamentos com varios dias. Por isso, a versao demonstrativa
+    separa blocos completos de 24h e calcula eventual periodo residual de forma isolada.
+    """
+    full_24h_blocks = int(duration_hours // 24)
+    residual_hours = duration_hours - (full_24h_blocks * 24)
+    has_residual_overnight = overnight_count > full_24h_blocks
+    return full_24h_blocks + calculate_residual_daily_fraction(
+        residual_hours,
+        has_residual_overnight,
+    )
+
+
+def calculate_daily_amount(daily_group, daily_range, daily_quantity):
     base_amount = DAILY_RATES.get(daily_group, {}).get(daily_range)
     if base_amount is None:
-        raise ValueError("Enquadramento de diária inválido.")
-    return base_amount, base_amount * daily_factor
+        raise ValueError("Enquadramento de diaria invalido.")
+    return base_amount, base_amount * daily_quantity
 
 
 def get_overdue_accountability(user_id):
@@ -450,19 +495,18 @@ def get_overdue_accountability(user_id):
 
 def calculate_request_amount(user, form):
     daily_group = user["daily_group"]
-    has_overnight = form.get("has_overnight") == "1"
 
     if daily_group not in DAILY_RATES:
-        raise ValueError("Seu usuário não possui grupo de diária cadastrado. Procure o validador.")
+        raise ValueError("Seu usuario nao possui grupo de diaria cadastrado. Procure o validador.")
 
     destination = form.get("destination", "").strip()
     state, city = parse_destination(destination)
     if not state or not city:
-        raise ValueError("Selecione o município de destino.")
+        raise ValueError("Selecione o municipio de destino.")
 
     departure_date = parse_form_date(form["departure_date"])
     return_date = parse_form_date(form["return_date"])
-    departure_time = parse_form_time(form.get("departure_time"), "a hora de saída")
+    departure_time = parse_form_time(form.get("departure_time"), "a hora de saida")
     return_time = parse_form_time(form.get("return_time"), "a hora prevista de retorno")
     duration_hours = validate_travel_period(
         departure_date,
@@ -470,25 +514,32 @@ def calculate_request_amount(user, form):
         return_date,
         return_time,
     )
+    overnight_count = validate_overnight_count(
+        form.get("overnight_count", form.get("has_overnight", "0")),
+        departure_date,
+        return_date,
+    )
     distance_km = get_destination_distance(state, city)
     daily_range = determine_daily_range(state, city, distance_km)
-    daily_factor = calculate_daily_factor(duration_hours, has_overnight)
+    daily_quantity = calculate_daily_quantity(duration_hours, overnight_count)
     base_amount, estimated_amount = calculate_daily_amount(
         daily_group,
         daily_range,
-        daily_factor,
+        daily_quantity,
     )
 
     return {
         "daily_group": daily_group,
         "daily_range": daily_range,
-        "has_overnight": has_overnight,
+        "has_overnight": overnight_count > 0,
+        "overnight_count": overnight_count,
         "departure_date": departure_date,
         "return_date": return_date,
         "departure_time": departure_time,
         "return_time": return_time,
         "distance_km": distance_km,
-        "daily_factor": daily_factor,
+        "daily_factor": daily_quantity,
+        "daily_quantity": daily_quantity,
         "base_amount": base_amount,
         "estimated_amount": estimated_amount,
         "duration_hours": duration_hours,
@@ -547,6 +598,13 @@ def decimal_br(value, places=1):
     if value is None:
         return "-"
     return f"{float(value):.{places}f}".replace(".", ",")
+
+
+@app.template_filter("daily_quantity_br")
+def daily_quantity_br(value):
+    quantity = float(value or 0)
+    label = "diaria" if abs(quantity - 1.0) < 0.001 else "diarias"
+    return f"{quantity:.2f}".replace(".", ",") + f" {label}"
 
 
 @app.template_filter("duration_br")
@@ -1033,9 +1091,9 @@ def new_request():
                     user_id, destination, departure_date, return_date, objective,
                     estimated_amount, daily_group, daily_range, has_overnight,
                     departure_time, return_time, distance_km, daily_factor, base_amount,
-                    status, created_at, updated_at
+                    overnight_count, daily_quantity, status, created_at, updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'enviada', ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'enviada', ?, ?)
                 """,
                 (
                     user["id"],
@@ -1052,6 +1110,8 @@ def new_request():
                     calculated["distance_km"],
                     calculated["daily_factor"],
                     calculated["base_amount"],
+                    calculated["overnight_count"],
+                    calculated["daily_quantity"],
                     now,
                     now,
                 ),
@@ -1092,7 +1152,7 @@ def edit_request(request_id):
                 SET destination = ?, departure_date = ?, return_date = ?, objective = ?,
                     estimated_amount = ?, daily_group = ?, daily_range = ?, has_overnight = ?,
                     departure_time = ?, return_time = ?, distance_km = ?, daily_factor = ?, base_amount = ?,
-                    status = 'corrigida', updated_at = ?
+                    overnight_count = ?, daily_quantity = ?, status = 'corrigida', updated_at = ?
                 WHERE id = ?
                 """,
                 (
@@ -1109,6 +1169,8 @@ def edit_request(request_id):
                     calculated["distance_km"],
                     calculated["daily_factor"],
                     calculated["base_amount"],
+                    calculated["overnight_count"],
+                    calculated["daily_quantity"],
                     datetime.now().isoformat(timespec="seconds"),
                     request_id,
                 ),
