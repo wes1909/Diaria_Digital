@@ -1,3 +1,5 @@
+// Prévia do cálculo exibida no formulário. Repete DAILY_RATES e as regras de cálculo de app.py,
+// que recalcula o valor definitivo antes de salvar. Qualquer alteração deve ser feita nos dois arquivos.
 const valoresDiarias = {
     agente_politico_comissionado: {
         label: "Prefeito Municipal, Vice-Prefeito, Vereadores e Secretários",
@@ -19,6 +21,7 @@ const valoresDiarias = {
     },
 };
 
+// Residual de exatamente 12 h sem pernoite: decisão operacional (mesmo valor de EXACT_12_HOURS_DAILY_FRACTION em app.py).
 const FRACAO_OPERACIONAL_12_HORAS = 0.70;
 
 const campoGrupoDiaria = document.querySelector("#dailyGroupSelect");
@@ -136,6 +139,7 @@ function calcularFracaoResidual(horasResiduais, residualComPernoite) {
     if (horasResiduais <= 0) {
         return 0;
     }
+    // Havendo pernoite, o residual vale 1,00 diária independentemente da duração (decisão operacional).
     if (residualComPernoite) {
         return 1;
     }

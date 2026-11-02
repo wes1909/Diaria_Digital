@@ -25,7 +25,7 @@ camposHorario24h.forEach((campo) => {
             minutos > 59 ||
             campo.value.length !== 5
         ) {
-            campo.setCustomValidity("Informe um hor?rio v?lido no formato 24 horas HH:MM.");
+            campo.setCustomValidity("Informe um horário válido no formato 24 horas HH:MM.");
             campo.classList.add("is-invalid");
             campo.reportValidity();
             return;

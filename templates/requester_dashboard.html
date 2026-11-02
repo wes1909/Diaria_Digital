@@ -18,7 +18,7 @@
         <strong>Prestação de contas pendente</strong>
         <span>
             A solicitação #{{ overdue_accountability["id"] }} com data de retorno em
-            {{ overdue_accountability["return_date"]|date_br }} ultrapassou o prazo de 48 horas de prestação de contas.
+            {{ overdue_accountability["return_date"]|date_br }} ultrapassou o prazo de dois dias para a prestação de contas.
             Regularize a prestação antes de criar nova solicitação.
         </span>
         <a href="{{ url_for('request_detail', request_id=overdue_accountability['id']) }}">Abrir solicitação pendente</a>

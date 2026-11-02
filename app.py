@@ -35,11 +35,15 @@ DEMO_ENVIRONMENTS_ROOT = Path(tempfile.gettempdir()) / "diaria_digital_demo"
 DEMO_ENVIRONMENT_MAX_AGE = timedelta(days=7)
 ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "doc", "docx"}
 ACCOUNTABILITY_ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg"}
+# Prazo da prestação de contas: contado em dias a partir da data de retorno, sem considerar o horário.
+# Simplifica a previsão da Lei Municipal nº 1.839/2026 (primeiro dia útil subsequente).
 ACCOUNTABILITY_DEADLINE_DAYS = 2
-# Regra operacional demonstrativa para o caso exatamente igual a 12h, nao definido expressamente na referencia legal usada no projeto.
+# Fração aplicada ao residual de exatamente 12 h sem pernoite: decisão operacional da demonstração,
+# pois o caso não é definido expressamente na Lei Municipal nº 1.839/2026.
 EXACT_12_HOURS_DAILY_FRACTION = 0.70
 
 app = Flask(__name__)
+# Chave apenas acadêmica; em uso real, deve ser definida por variável de ambiente.
 app.config["SECRET_KEY"] = "chave-academica-altere-em-producao"
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=7)
 
@@ -49,6 +53,9 @@ DEMO_REQUESTER_CPF = "11111111111"
 DEMO_VALIDATOR_CPF = "22222222222"
 DEMO_CLEAR_REQUESTER_CPF = "33333333333"
 
+# Grupos funcionais da Lei Municipal nº 1.839/2026. Apesar do nome, a chave "agente_politico_comissionado"
+# não inclui os cargos em comissão, que pertencem a "servidor_geral". O nome foi mantido por
+# compatibilidade com os registros já gravados no banco.
 DAILY_GROUPS = {
     "agente_politico_comissionado": "Prefeito Municipal, Vice-Prefeito, Vereadores e Secretários",
     "servidor_geral": "Demais servidores efetivos, contratados, temporários e cargos em comissão",
@@ -61,6 +68,8 @@ DAILY_RANGES = {
     "capital_federal_ou_acima_1000": "Capital Federal ou acima de 1000 km",
 }
 
+# Valores-base da Lei Municipal nº 1.839/2026 (Quadro 1 do TCC).
+# Os mesmos valores estão repetidos em static/calculo_diarias.js; alterar nos dois arquivos.
 DAILY_RATES = {
     "agente_politico_comissionado": {
         "sc_ate_200": 300.00,
@@ -90,6 +99,8 @@ STATUS_LABELS = {
     "rejeitada": "Rejeitada",
 }
 
+# Não utilizada no código; os status em que o validador analisa a solicitação estão definidos
+# diretamente em templates/request_detail.html.
 REQUEST_REVIEW_STATUSES = {"enviada", "corrigida", "correcao_solicitada", "aprovada"}
 ACCOUNTABILITY_REVIEW_STATUSES = {"prestacao_enviada", "prestacao_corrigida"}
 
@@ -97,30 +108,32 @@ PROCESS_STAGES = [
     {
         "key": "solicitacao",
         "label": "Solicita\u00e7\u00e3o",
-        "description": "Dados da viagem sao preenchidos e encaminhados para analise.",
+        "description": "Dados da viagem são preenchidos e encaminhados para análise.",
     },
     {
         "key": "analise",
         "label": "An\u00e1lise",
-        "description": "A solicitacao e conferida pelo servidor responsavel pela validacao.",
+        "description": "A solicitação é conferida pelo servidor responsável pela validação.",
     },
     {
         "key": "viagem",
         "label": "Viagem",
-        "description": "A solicitacao foi aprovada e o afastamento esta autorizado.",
+        "description": "A solicitação foi aprovada e o afastamento está autorizado.",
     },
     {
         "key": "prestacao",
         "label": "Presta\u00e7\u00e3o de contas",
-        "description": "O servidor apresenta as informacoes e os comprovantes referentes a viagem realizada.",
+        "description": "O servidor apresenta as informações e os comprovantes referentes à viagem realizada.",
     },
     {
         "key": "conclusao",
         "label": "Conclus\u00e3o",
-        "description": "A prestacao de contas foi analisada e o processo foi finalizado.",
+        "description": "A prestação de contas foi analisada e o processo foi finalizado.",
     },
 ]
 
+# "rejeitada" não consta neste mapeamento de propósito: get_process_progress() a apresenta
+# como processo interrompido.
 PROCESS_STAGE_BY_STATUS = {
     "rascunho": 0,
     "correcao_solicitada": 0,
@@ -146,9 +159,9 @@ def normalize_cpf(cpf):
 
 def validate_cpf(cpf):
     normalized = normalize_cpf(cpf)
-    # Versao demonstrativa: valida somente presenca/formato, sem digitos verificadores oficiais.
+    # Versão demonstrativa: confere somente a presença de 11 dígitos, sem validar os dígitos verificadores.
     if len(normalized) != 11:
-        raise ValueError("Informe um CPF com 11 digitos.")
+        raise ValueError("Informe um CPF com 11 dígitos.")
     return normalized
 
 
@@ -169,12 +182,12 @@ def is_valid_demo_environment_id(environment_id):
 
 def get_demo_environment_folder(environment_id):
     if not is_valid_demo_environment_id(environment_id):
-        raise ValueError("Identificador de ambiente demonstrativo invalido.")
+        raise ValueError("Identificador de ambiente demonstrativo inválido.")
     return DEMO_ENVIRONMENTS_ROOT / environment_id
 
 
 def cleanup_old_demo_environments(current_environment_id=None):
-    """Remove somente ambientes UUID sem utilizacao ha mais de 7 dias."""
+    """Remove os ambientes demonstrativos sem utilização há mais de 7 dias, exceto o ambiente atual."""
     if not DEMO_ENVIRONMENTS_ROOT.exists():
         return
     cutoff = datetime.now().timestamp() - DEMO_ENVIRONMENT_MAX_AGE.total_seconds()
@@ -194,7 +207,7 @@ def cleanup_old_demo_environments(current_environment_id=None):
 
 
 def copy_demo_base_uploads(database_path, upload_folder):
-    """Copia apenas arquivos referenciados pelo banco-base, quando existirem."""
+    """Copia para o ambiente da sessão apenas os arquivos referenciados no banco-modelo, quando existirem."""
     if not DEMO_BASE_UPLOAD_FOLDER.is_dir():
         return
     with closing(sqlite3.connect(database_path)) as db:
@@ -209,6 +222,8 @@ def copy_demo_base_uploads(database_path, upload_folder):
 
 
 def prepare_demo_scenarios(database_path):
+    """Prepara os cenários de cada nova cópia do banco: a viagem do CPF 111 passa a ter retorno
+    três dias antes da data atual (prestação vencida) e o CPF 333 começa sem pendência."""
     today = datetime.now().date()
     overdue_return = today - timedelta(days=3)
     overdue_departure = overdue_return - timedelta(days=1)
@@ -260,7 +275,7 @@ def prepare_demo_scenarios(database_path):
                     ),
                 )
         if clear_user:
-            # Mantem eventuais viagens-base, mas impede que comecem vencidas.
+            # Mantém eventuais viagens do banco-modelo, mas impede que o CPF 333 comece com pendência vencida.
             db.execute(
                 """
                 UPDATE requests SET return_date = ?, updated_at = ?
@@ -276,7 +291,7 @@ def prepare_demo_scenarios(database_path):
 
 def create_demo_environment(environment_id):
     if not DEMO_BASE_DATABASE.is_file():
-        raise RuntimeError("Banco-base da demonstracao nao encontrado.")
+        raise RuntimeError("Banco-modelo da demonstração não encontrado.")
     DEMO_ENVIRONMENTS_ROOT.mkdir(parents=True, exist_ok=True)
     cleanup_old_demo_environments(environment_id)
     environment_folder = get_demo_environment_folder(environment_id)
@@ -295,7 +310,7 @@ def create_demo_environment(environment_id):
 
 def get_demo_environment_id():
     if not has_request_context():
-        raise RuntimeError("O ambiente demonstrativo exige um contexto de requisicao.")
+        raise RuntimeError("O ambiente demonstrativo exige um contexto de requisição.")
     session.permanent = True
     environment_id = session.get("demo_environment_id")
     if not is_valid_demo_environment_id(environment_id):
@@ -310,6 +325,7 @@ def get_demo_database_path():
     database_path = environment_folder / "diarias.db"
     if not database_path.is_file():
         create_demo_environment(environment_id)
+    # Registra a atividade do ambiente; a data é usada por cleanup_old_demo_environments().
     os.utime(environment_folder, None)
     return database_path
 
@@ -551,6 +567,8 @@ def inject_user():
 
 
 def load_locality_distances():
+    """Lê as distâncias do objeto distanciasLocalidadesKm em static/localidades.js.
+    O objeto precisa manter formato compatível com JSON; caso contrário, nenhuma distância é carregada."""
     if not LOCALITIES_FILE.exists():
         return {}
     source = LOCALITIES_FILE.read_text(encoding="utf-8")
@@ -591,6 +609,8 @@ def get_destination_distance(state, city):
 
 
 def determine_daily_range(state, city, distance_km):
+    """Define a faixa da diária: Florianópolis e Brasília pela regra de capital;
+    os demais destinos pela distância rodoviária e pela UF."""
     if is_federal_capital(state, city):
         return "capital_federal_ou_acima_1000"
     if is_state_capital(state, city):
@@ -662,40 +682,44 @@ def validate_overnight_count(raw_value, departure_date, return_date):
     value = (raw_value if raw_value not in (None, "") else "0")
     value = str(value).strip()
     if not re.fullmatch(r"\d+", value):
-        raise ValueError("Informe a quantidade de pernoites como numero inteiro maior ou igual a zero.")
+        raise ValueError("Informe a quantidade de pernoites como número inteiro maior ou igual a zero.")
 
     overnight_count = int(value)
     max_overnights = calculate_max_overnights(departure_date, return_date)
     if overnight_count > max_overnights:
-        raise ValueError(f"A quantidade de pernoites nao pode ser maior que {max_overnights} para o periodo informado.")
+        raise ValueError(f"A quantidade de pernoites não pode ser maior que {max_overnights} para o período informado.")
     if max_overnights == 0 and overnight_count > 0:
-        raise ValueError("Viagens com saida e retorno no mesmo dia devem ter zero pernoites.")
+        raise ValueError("Viagens com saída e retorno no mesmo dia devem ter zero pernoites.")
     return overnight_count
 
 
 def calculate_residual_daily_fraction(residual_hours, has_residual_overnight):
     if residual_hours <= 0:
         return 0.0
+    # Decisão operacional: havendo pernoite, o residual vale 1,00 diária independentemente da duração
+    # (a lei prevê 1,00 diária para período superior a 12 h com pernoite).
     if has_residual_overnight:
         return 1.0
     if residual_hours > 12:
         return 0.70
     if residual_hours < 12:
         return 0.50
-    # Decisao operacional demonstrativa: o caso exatamente 12h nao esta definido no trecho legal usado.
+    # Decisão operacional: o caso de exatamente 12 h não é definido na lei (ver EXACT_12_HOURS_DAILY_FRACTION).
     return EXACT_12_HOURS_DAILY_FRACTION
 
 
 def calculate_daily_quantity(duration_hours, overnight_count):
     """
-    Regra operacional demonstrativa para multiplas diarias.
+    Regra operacional demonstrativa para múltiplas diárias.
 
-    A referencia legal do projeto define fracoes para periodos simples, mas nao detalha
-    decomposicao de afastamentos com varios dias. Por isso, a versao demonstrativa
-    separa blocos completos de 24h e calcula eventual periodo residual de forma isolada.
+    A Lei Municipal nº 1.839/2026 define frações para períodos simples, mas não detalha a
+    decomposição de afastamentos com vários dias. Por isso, a versão demonstrativa separa
+    blocos completos de 24 h (1,00 diária cada) e calcula o eventual período residual em
+    calculate_residual_daily_fraction().
     """
     full_24h_blocks = int(duration_hours // 24)
     residual_hours = duration_hours - (full_24h_blocks * 24)
+    # Cada bloco de 24 h consome no máximo um pernoite; pernoites excedentes são atribuídos ao residual.
     has_residual_overnight = overnight_count > full_24h_blocks
     return full_24h_blocks + calculate_residual_daily_fraction(
         residual_hours,
@@ -706,11 +730,13 @@ def calculate_daily_quantity(duration_hours, overnight_count):
 def calculate_daily_amount(daily_group, daily_range, daily_quantity):
     base_amount = DAILY_RATES.get(daily_group, {}).get(daily_range)
     if base_amount is None:
-        raise ValueError("Enquadramento de diaria invalido.")
+        raise ValueError("Enquadramento de diária inválido.")
     return base_amount, base_amount * daily_quantity
 
 
 def get_overdue_accountability(user_id):
+    """Retorna a viagem mais antiga com prestação de contas vencida: aprovada sem prestação ou com
+    correção da prestação solicitada, cujo retorno ocorreu há pelo menos ACCOUNTABILITY_DEADLINE_DAYS dias."""
     deadline_date = (datetime.now().date() - timedelta(days=ACCOUNTABILITY_DEADLINE_DAYS)).isoformat()
     with closing(get_db()) as db, db:
         return db.execute(
@@ -734,16 +760,16 @@ def calculate_request_amount(user, form):
     daily_group = user["daily_group"]
 
     if daily_group not in DAILY_RATES:
-        raise ValueError("Seu usuario nao possui grupo de diaria cadastrado. Procure o validador.")
+        raise ValueError("Seu usuário não possui grupo de diária cadastrado. Procure o validador.")
 
     destination = form.get("destination", "").strip()
     state, city = parse_destination(destination)
     if not state or not city:
-        raise ValueError("Selecione o municipio de destino.")
+        raise ValueError("Selecione o município de destino.")
 
     departure_date = parse_form_date(form["departure_date"])
     return_date = parse_form_date(form["return_date"])
-    departure_time = parse_form_time(form.get("departure_time"), "a hora de saida")
+    departure_time = parse_form_time(form.get("departure_time"), "a hora de saída")
     return_time = parse_form_time(form.get("return_time"), "a hora prevista de retorno")
     duration_hours = validate_travel_period(
         departure_date,
@@ -840,7 +866,7 @@ def decimal_br(value, places=1):
 @app.template_filter("daily_quantity_br")
 def daily_quantity_br(value):
     quantity = float(value or 0)
-    label = "diaria" if abs(quantity - 1.0) < 0.001 else "diarias"
+    label = "diária" if abs(quantity - 1.0) < 0.001 else "diárias"
     return f"{quantity:.2f}".replace(".", ",") + f" {label}"
 
 
@@ -949,9 +975,9 @@ def validate_user_form(form, user_id=None, password_required=False):
     if not name:
         raise ValueError("Informe o nome.")
     if not registration:
-        raise ValueError("Informe a matricula.")
+        raise ValueError("Informe a matrícula.")
     if not public_position:
-        raise ValueError("Informe o cargo, emprego ou funcao.")
+        raise ValueError("Informe o cargo, emprego ou função.")
     if password_required and not password:
         raise ValueError("Informe a senha.")
     if password and len(password) < 6:
@@ -963,7 +989,7 @@ def validate_user_form(form, user_id=None, password_required=False):
             (cpf, user_id, user_id),
         ).fetchone()
     if existing:
-        raise ValueError("Ja existe usuario cadastrado com este CPF.")
+        raise ValueError("Já existe usuário cadastrado com este CPF.")
 
     return {
         "name": name,
@@ -1082,6 +1108,8 @@ def validate_accountability_form(form, displacement_files, objective_files, atta
         raise ValueError("O valor a devolver não pode ser maior que o valor recebido.")
     if not form.get("accountability_text", "").strip():
         raise ValueError("Informe o resumo da prestação de contas.")
+    # Devolução integral (viagem não realizada): somente o resumo é exigido;
+    # horários, meio de transporte e comprovantes deixam de ser obrigatórios.
     if refund_amount == received_amount:
         return ([], [])
 
@@ -1132,13 +1160,14 @@ def login():
         password = request.form["password"]
 
         if len(cpf) != 11:
-            flash("Informe um CPF com 11 digitos.", "danger")
+            flash("Informe um CPF com 11 dígitos.", "danger")
             return render_template("login.html")
 
         with closing(get_db()) as db, db:
             user = db.execute("SELECT * FROM users WHERE cpf = ?", (cpf,)).fetchone()
 
         if user and check_password_hash(user["password_hash"], password):
+            # Preserva o ambiente demonstrativo ao limpar a sessão, permitindo alternar entre os perfis.
             environment_id = session.get("demo_environment_id")
             session.clear()
             session.permanent = True
@@ -1147,7 +1176,7 @@ def login():
             flash("Login realizado com sucesso.", "success")
             return redirect(url_for("index"))
 
-        flash("CPF ou senha invalidos.", "danger")
+        flash("CPF ou senha inválidos.", "danger")
 
     return render_template("login.html")
 
@@ -1167,7 +1196,7 @@ def reset_demo_environment():
         if environment_folder.is_dir() and not environment_folder.is_symlink():
             shutil.rmtree(environment_folder)
     session.clear()
-    flash("Ambiente de demonstracao reiniciado com sucesso.", "success")
+    flash("Ambiente de demonstração reiniciado com sucesso.", "success")
     return redirect(url_for("login"))
 
 
@@ -1357,7 +1386,7 @@ def new_request():
     overdue_accountability = get_overdue_accountability(user["id"])
     if overdue_accountability:
         flash(
-            "Você possui prestação de contas pendente há mais de 48 horas e não pode criar nova solicitação.",
+            "Você possui prestação de contas com prazo vencido e não pode criar nova solicitação.",
             "danger",
         )
         return redirect(url_for("request_detail", request_id=overdue_accountability["id"]))
